@@ -42,6 +42,10 @@ let currentStudentModalKey = null;
 let lockMap = new Map();
 let duplicateReviewMap = new Map();
 let unsubscribeDuplicateReviews = null;
+let teacherClassMap = new Map();
+let unsubscribeTeacherClasses = null;
+let myAssignedClass = "";
+let showingMyClassOnly = false;
 
 function toast(message) {
   toastEl.textContent = message;
@@ -168,6 +172,88 @@ function duplicatesSet(key) {
   groupBy(key).forEach(([,v]) => v.forEach(x => set.add(x.id)));
   return set;
 }
+function normalizeEmail(v = "") {
+  return String(v || "").trim().toLowerCase();
+}
+
+function getAssignedClassForEmail(email = "") {
+  const key = normalizeEmail(email);
+  return teacherClassMap.get(key)?.classNo || "";
+}
+
+function updateMyClassUI() {
+  const user = auth.currentUser;
+  const email = normalizeEmail(user?.email || "");
+  myAssignedClass = getAssignedClassForEmail(email);
+
+  $("#myClassAccount").textContent = email || "";
+  $("#myClassLabel").textContent = myAssignedClass
+    ? `${myAssignedClass}반 담임`
+    : "담당반 미지정";
+
+  $("#showMyClassBtn").disabled = !myAssignedClass;
+  $("#teacherClassManageBtn").classList.toggle("hidden", !isPinAdmin(user));
+
+  if (showingMyClassOnly && myAssignedClass) {
+    $("#filterClass").value = myAssignedClass;
+  }
+}
+
+function applyMyClassView() {
+  if (!myAssignedClass) {
+    toast("현재 계정의 담당반이 지정되어 있지 않습니다.");
+    return;
+  }
+  showingMyClassOnly = true;
+  $("#filterClass").value = myAssignedClass;
+  renderTable();
+  renderClassStatus();
+  toast(`${myAssignedClass}반 중심 화면으로 전환했습니다.`);
+}
+
+function applyAllClassView() {
+  showingMyClassOnly = false;
+  $("#filterClass").value = "";
+  renderTable();
+  renderClassStatus();
+  toast("전체 학년 화면으로 전환했습니다.");
+}
+
+function buildTeacherClassList() {
+  const host = $("#teacherClassList");
+  const standardEmails = Array.from({length:9}, (_,i) => `teacher${i+1}@gangil.kr`);
+
+  host.innerHTML = standardEmails.map(email => {
+    const assigned = getAssignedClassForEmail(email);
+    return `
+      <div class="teacher-class-row">
+        <div>
+          <strong>${escapeHtml(email)}</strong>
+          ${normalizeEmail(PIN_ADMIN_EMAIL) === normalizeEmail(email) ? `<span class="admin-chip">최고관리자</span>` : ""}
+        </div>
+        <select class="teacher-class-select" data-email="${escapeHtml(email)}">
+          <option value="">미지정</option>
+          ${Array.from({length:9},(_,i)=>String(i+1)).map(c =>
+            `<option value="${c}" ${assigned === c ? "selected" : ""}>${c}반</option>`
+          ).join("")}
+        </select>
+      </div>
+    `;
+  }).join("");
+}
+
+function openTeacherClassModal() {
+  if (!isPinAdmin()) return toast("최고관리자만 담당반을 설정할 수 있습니다.");
+  buildTeacherClassList();
+  $("#teacherClassModal").classList.remove("hidden");
+  $("#teacherClassModal").setAttribute("aria-hidden", "false");
+}
+
+function closeTeacherClassModal() {
+  $("#teacherClassModal").classList.add("hidden");
+  $("#teacherClassModal").setAttribute("aria-hidden", "true");
+}
+
 function filteredRows() {
   const c = $("#filterClass").value;
   const type = $("#filterType").value;
@@ -459,11 +545,58 @@ function render() {
   renderTable();
 }
 ["filterClass","filterType","filterStatus","filterResult","viewMode"].forEach(id => $("#"+id).addEventListener("change", () => {
+  if (id === "filterClass") {
+    showingMyClassOnly = $("#filterClass").value === myAssignedClass && !!myAssignedClass;
+  }
   renderStatusSummary();
   renderResultSummary();
   renderTable();
 }));
 $("#searchInput").addEventListener("input", renderTable);
+$("#showMyClassBtn").addEventListener("click", applyMyClassView);
+$("#showAllClassesBtn").addEventListener("click", applyAllClassView);
+$("#teacherClassManageBtn").addEventListener("click", openTeacherClassModal);
+$("#teacherClassCloseBtn").addEventListener("click", closeTeacherClassModal);
+
+$("#teacherClassModal").addEventListener("click", (e) => {
+  if (e.target === $("#teacherClassModal")) closeTeacherClassModal();
+});
+
+$("#teacherClassSaveBtn").addEventListener("click", async () => {
+  if (!isPinAdmin()) return toast("최고관리자만 저장할 수 있습니다.");
+
+  const btn = $("#teacherClassSaveBtn");
+  btn.disabled = true;
+  btn.textContent = "저장 중...";
+
+  try {
+    const batch = writeBatch(db);
+    const selects = [...document.querySelectorAll(".teacher-class-select")];
+
+    for (const select of selects) {
+      const email = normalizeEmail(select.dataset.email);
+      const classNo = select.value;
+      const ref = doc(db, "teacherClasses", email.replaceAll("/", "_"));
+
+      batch.set(ref, {
+        email,
+        classNo,
+        updatedAt: serverTimestamp(),
+        updatedByUid: auth.currentUser?.uid || ""
+      }, {merge:true});
+    }
+
+    await batch.commit();
+    toast("교사 담당반 설정을 저장했습니다.");
+    closeTeacherClassModal();
+  } catch (e) {
+    console.error(e);
+    toast("담당반 설정 저장에 실패했습니다.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "담당반 설정 저장";
+  }
+});
 $("#filterDuplicateReview").addEventListener("change", () => {
   renderDuplicates();
 });
@@ -599,6 +732,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (!$("#passwordModal").classList.contains("hidden")) closePasswordModal();
     if (!$("#studentModal").classList.contains("hidden")) closeStudentModal();
+    if (!$("#teacherClassModal").classList.contains("hidden")) closeTeacherClassModal();
   }
 });
 
@@ -665,10 +799,34 @@ onAuthStateChanged(auth, user => {
   if (user) {
     $("#loginPanel").classList.add("hidden");
     $("#dashboard").classList.remove("hidden");
+    updateMyClassUI();
     if (unsubscribe) unsubscribe();
     if (unsubscribeRoster) unsubscribeRoster();
     if (unsubscribeLocks) unsubscribeLocks();
     if (unsubscribeDuplicateReviews) unsubscribeDuplicateReviews();
+    if (unsubscribeTeacherClasses) unsubscribeTeacherClasses();
+
+    unsubscribeTeacherClasses = onSnapshot(collection(db, "teacherClasses"), snap => {
+      teacherClassMap = new Map(
+        snap.docs.map(d => {
+          const data = d.data();
+          return [normalizeEmail(data.email), {id:d.id, ...data}];
+        })
+      );
+
+      updateMyClassUI();
+
+      // 로그인 직후에는 담당반이 지정되어 있다면 자동으로 자기 반 중심으로 시작
+      if (myAssignedClass && !showingMyClassOnly && !$("#filterClass").value) {
+        showingMyClassOnly = true;
+        $("#filterClass").value = myAssignedClass;
+      }
+
+      renderClassStatus();
+      renderTable();
+    }, err => {
+      console.error(err);
+    });
 
     unsubscribeDuplicateReviews = onSnapshot(collection(db, "duplicateReviews"), snap => {
       duplicateReviewMap = new Map(snap.docs.map(d => [d.id, {id:d.id, ...d.data()}]));
@@ -715,6 +873,10 @@ onAuthStateChanged(auth, user => {
     if (unsubscribeRoster) { unsubscribeRoster(); unsubscribeRoster = null; }
     if (unsubscribeLocks) { unsubscribeLocks(); unsubscribeLocks = null; }
     if (unsubscribeDuplicateReviews) { unsubscribeDuplicateReviews(); unsubscribeDuplicateReviews = null; }
+    if (unsubscribeTeacherClasses) { unsubscribeTeacherClasses(); unsubscribeTeacherClasses = null; }
+    teacherClassMap = new Map();
+    myAssignedClass = "";
+    showingMyClassOnly = false;
     lockMap = new Map();
     duplicateReviewMap = new Map();
     rows = [];

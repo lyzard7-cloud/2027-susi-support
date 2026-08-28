@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>교사용 | 2027 수시지원 관리</title>
-  <link rel="stylesheet" href="./style.css?v=11.0" />
+  <link rel="stylesheet" href="./style.css?v=12.0" />
 </head>
 <body>
   <header class="topbar">
@@ -70,6 +70,23 @@
         <div id="rosterUploadStatus" class="helper"></div>
         <div class="pin-admin-note">PIN을 재발급하면 기존 PIN은 즉시 사용할 수 없게 됩니다. 학생들에게 새 PIN을 다시 안내해야 합니다.</div>
         <div id="pinAdminOnlyNote" class="pin-admin-only hidden"></div>
+      </section>
+
+      <section class="card myclass-card">
+        <div class="myclass-bar">
+          <div>
+            <span class="eyebrow">담당반</span>
+            <div class="myclass-title">
+              <strong id="myClassLabel">담당반 확인 중</strong>
+              <span id="myClassAccount" class="helper"></span>
+            </div>
+          </div>
+          <div class="myclass-actions">
+            <button id="showMyClassBtn" class="secondary">내 반 보기</button>
+            <button id="showAllClassesBtn" class="ghost">전체 학년 보기</button>
+            <button id="teacherClassManageBtn" class="ghost hidden">교사 담당반 관리</button>
+          </div>
+        </div>
       </section>
 
       <section class="stats-grid">
@@ -251,6 +268,30 @@
   </main>
 
 
+
+  <div id="teacherClassModal" class="modal-backdrop hidden" aria-hidden="true">
+    <div class="modal-card teacher-class-modal" role="dialog" aria-modal="true" aria-labelledby="teacherClassModalTitle">
+      <div class="modal-head">
+        <div>
+          <span class="eyebrow">최고관리자 전용</span>
+          <h2 id="teacherClassModalTitle">교사 담당반 관리</h2>
+          <p class="helper">각 교사 계정이 로그인했을 때 기본으로 보게 될 반을 지정합니다.</p>
+        </div>
+        <button id="teacherClassCloseBtn" class="ghost small-btn" type="button">닫기</button>
+      </div>
+
+      <div class="teacher-class-help">
+        중복지원 탐지는 담당반 설정과 관계없이 항상 1~9반 전체를 비교합니다.
+      </div>
+
+      <div id="teacherClassList" class="teacher-class-list"></div>
+
+      <div class="modal-actions">
+        <button id="teacherClassSaveBtn" class="primary" type="button">담당반 설정 저장</button>
+      </div>
+    </div>
+  </div>
+
   <div id="studentModal" class="modal-backdrop hidden" aria-hidden="true">
     <div class="modal-card student-detail-modal" role="dialog" aria-modal="true" aria-labelledby="studentModalTitle">
       <div class="modal-head">
@@ -315,6 +356,6 @@
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./admin.js?v=11.0"></script>
+  <script type="module" src="./admin.js?v=12.0"></script>
 </body>
 </html>
