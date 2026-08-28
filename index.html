@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>2027학년도 3학년 수시지원 관리</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">S</span>
+      <div>
+        <div class="brand-title">2027 수시지원 관리</div>
+        <div class="brand-subtitle">3학년 지원정보 등록</div>
+      </div>
+    </div>
+    <a class="link-button" href="./admin.html">교사용</a>
+  </header>
+
+  <main class="container narrow">
+    <section class="hero">
+      <span class="eyebrow">학생용 입력 페이지</span>
+      <h1>지원 예정 대학을 등록하세요.</h1>
+      <p>현재 지원 예정인 대학·학과·전형을 입력하세요. 내용이 변경되면 같은 학생 정보로 다시 불러와 수정할 수 있습니다.</p>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <h2>학생 확인</h2>
+          <p>본인 정보로 기존 지원안을 불러오거나 새로 작성합니다.</p>
+        </div>
+      </div>
+
+      <div class="grid student-grid">
+        <label>반
+          <select id="classNo">
+            <option value="">선택</option>
+            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+            <option>6</option><option>7</option><option>8</option><option>9</option>
+          </select>
+        </label>
+        <label>번호
+          <input id="studentNo" inputmode="numeric" placeholder="예: 17" />
+        </label>
+        <label>이름
+          <input id="studentName" placeholder="예: 홍길동" autocomplete="off" />
+        </label>
+      </div>
+
+      <div class="inline-actions">
+        <button id="loadBtn" class="secondary">기존 지원정보 불러오기</button>
+        <span id="loadStatus" class="helper"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <h2>지원 대학</h2>
+          <p>전형유형과 전형명은 구분해서 입력하면 중복지원 확인이 더 정확합니다.</p>
+        </div>
+        <button id="addApplicationBtn" class="secondary">+ 지원 추가</button>
+      </div>
+
+      <div id="applications"></div>
+    </section>
+
+    <section class="notice">
+      <strong>개인정보 안내</strong>
+      <span>입력한 정보는 진학 상담 및 지원 중복 확인 목적으로 교사가 확인합니다. 다른 학생에게는 공개되지 않습니다.</span>
+    </section>
+
+    <div class="submit-bar">
+      <div>
+        <div class="submit-title">입력 내용을 다시 확인해 주세요.</div>
+        <div class="helper">지원 예정안은 추후 다시 불러와 수정할 수 있습니다.</div>
+      </div>
+      <button id="submitBtn" class="primary large">지원정보 저장</button>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="./student.js"></script>
+</body>
+</html>

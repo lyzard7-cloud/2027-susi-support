@@ -1,0 +1,46 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isTeacher() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'password';
+    }
+
+    function isOwner() {
+      return signedIn()
+        && resource.data.ownerUid == request.auth.uid;
+    }
+
+    match /applications/{applicationId} {
+      // 교사(이메일/비밀번호 로그인)는 전체 조회,
+      // 학생(익명 로그인)은 자신이 만든 문서만 조회합니다.
+      allow read: if isTeacher() || isOwner();
+
+      // 학생 신규 등록: 로그인 UID를 ownerUid로 반드시 저장
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasAll([
+          'classNo', 'studentNo', 'studentName', 'studentKey',
+          'university', 'department', 'admissionType', 'admissionName',
+          'ownerUid'
+        ])
+        && request.resource.data.classNo in ['1','2','3','4','5','6','7','8','9']
+        && request.resource.data.studentName.size() >= 2
+        && request.resource.data.university.size() >= 2
+        && request.resource.data.department.size() >= 2;
+
+      // 학생은 본인이 만든 문서만 수정/삭제 가능.
+      // 교사는 필요 시 모든 문서 수정/삭제 가능.
+      allow update: if isTeacher()
+        || (isOwner() && request.resource.data.ownerUid == request.auth.uid);
+
+      allow delete: if isTeacher() || isOwner();
+    }
+  }
+}
