@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import {
-  getFirestore, collection, onSnapshot, writeBatch, doc, getDocs
+  getFirestore, collection, onSnapshot, writeBatch, doc, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -65,6 +65,9 @@ function makeStudentKey(classNo, studentNo, studentName) {
   const name = String(studentName ?? "").trim();
   return `${c}-${n}-${normalize(name)}`;
 }
+async function sha256(text){const bytes=new TextEncoder().encode(text);const digest=await crypto.subtle.digest("SHA-256",bytes);return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("");}
+function generatePin(){const arr=new Uint32Array(1);crypto.getRandomValues(arr);return String(10000000+(arr[0]%90000000));}
+async function accessIdFor(studentKeyValue,pin){return sha256(`2027-susi-support|${studentKeyValue}|${pin}`);}
 function findHeaderKey(obj, candidates) {
   const keys = Object.keys(obj || {});
   return keys.find(k => candidates.includes(normalize(k))) || null;
@@ -262,6 +265,22 @@ function render() {
 }
 ["filterClass","filterType","viewMode"].forEach(id => $("#"+id).addEventListener("change", renderTable));
 $("#searchInput").addEventListener("input", renderTable);
+
+$("#generatePinsBtn").addEventListener("click", async () => {
+  if (!roster.length) return toast("먼저 학생 명단을 업로드해 주세요.");
+  if (!confirm(`현재 등록된 ${roster.length}명 전체의 PIN을 새로 발급합니다.\n\n기존 PIN은 사용할 수 없게 됩니다. 계속하시겠습니까?`)) return;
+  try {
+    $("#generatePinsBtn").disabled=true; $("#rosterUploadStatus").textContent="PIN을 생성하는 중입니다...";
+    const oldAccess=await getDocs(collection(db,"studentAccess")); const batch=writeBatch(db); oldAccess.forEach(d=>batch.delete(d.ref));
+    for (const st of roster){const pin=generatePin();const accessId=await accessIdFor(st.studentKey,pin);batch.update(doc(db,"students",st.id),{pin,accessId});batch.set(doc(db,"studentAccess",accessId),{studentKey:st.studentKey,classNo:st.classNo,studentNo:st.studentNo,createdAt:serverTimestamp()});}
+    await batch.commit(); $("#rosterUploadStatus").textContent=`${roster.length}명의 새 PIN을 생성했습니다.`; toast("PIN 재발급이 완료되었습니다.");
+  } catch(e){console.error(e);toast(e.message||"PIN 생성 중 오류가 발생했습니다.");} finally{$("#generatePinsBtn").disabled=false;}
+});
+
+$("#exportPinsBtn").addEventListener("click",()=>{
+  if(!roster.length)return toast("학생 명단이 없습니다.");const missing=roster.filter(r=>!r.pin);if(missing.length)return toast(`PIN이 없는 학생이 ${missing.length}명 있습니다. PIN 일괄 생성을 먼저 실행하세요.`);
+  const data=[...roster].sort((a,b)=>Number(a.classNo)-Number(b.classNo)||Number(a.studentNo)-Number(b.studentNo));const rowsCsv=[["반","번호","이름","PIN"],...data.map(r=>[r.classNo,r.studentNo,r.studentName,r.pin])];const csv="\ufeff"+rowsCsv.map(row=>row.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`학생_PIN_목록_${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);toast("학생 PIN 목록을 내려받았습니다.");
+});
 
 $("#uploadRosterBtn").addEventListener("click", async () => {
   const input = $("#rosterFile");

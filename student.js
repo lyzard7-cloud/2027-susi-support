@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import {
-  getFirestore, collection, query, where, getDocs, writeBatch, doc,
+  getFirestore, collection, query, where, getDocs, getDoc, setDoc, writeBatch, doc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import {
@@ -28,6 +28,8 @@ const $ = (s) => document.querySelector(s);
 const applicationsEl = $("#applications");
 const toastEl = $("#toast");
 let loadedStudentKey = null;
+let verifiedStudentKey = null;
+let verifiedAccessId = null;
 
 function toast(message) {
   toastEl.textContent = message;
@@ -74,6 +76,24 @@ function studentKey() {
   const n = $("#studentNo").value.trim().padStart(2, "0");
   const name = $("#studentName").value.trim();
   return `${c}-${n}-${normalize(name)}`;
+}
+async function sha256(text) {
+  const bytes = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+async function accessIdFor(studentKeyValue, pin) {
+  return sha256(`2027-susi-support|${studentKeyValue}|${pin}`);
+}
+async function verifyPin(id) {
+  const pin = $("#studentPin").value.trim();
+  if (!/^\d{8}$/.test(pin)) throw new Error("교사가 안내한 8자리 PIN을 입력해 주세요.");
+  const accessId = await accessIdFor(id.studentKey, pin);
+  const accessSnap = await getDoc(doc(db, "studentAccess", accessId));
+  if (!accessSnap.exists() || accessSnap.data().studentKey !== id.studentKey) throw new Error("학생 정보 또는 PIN이 맞지 않습니다.");
+  await setDoc(doc(db, "studentSessions", currentUser.uid), {studentKey:id.studentKey, accessId, updatedAt:serverTimestamp()});
+  verifiedStudentKey = id.studentKey;
+  verifiedAccessId = accessId;
 }
 
 function applicationTemplate(data = {}) {
@@ -154,12 +174,10 @@ $("#addApplicationBtn").addEventListener("click", () => applicationTemplate());
 $("#loadBtn").addEventListener("click", async () => {
   try {
     const id = getIdentity();
-    $("#loadStatus").textContent = "조회 중...";
-    const q = query(
-      collection(db, "applications"),
-      where("studentKey", "==", id.studentKey),
-      where("ownerUid", "==", currentUser.uid)
-    );
+    $("#loadStatus").textContent = "본인 확인 중...";
+    await verifyPin(id);
+    $("#loadStatus").textContent = "지원정보 조회 중...";
+    const q = query(collection(db, "applications"), where("studentKey", "==", id.studentKey));
     const snap = await getDocs(q);
     applicationsEl.innerHTML = "";
     const rows = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.priority||99)-(b.priority||99));
@@ -182,16 +200,13 @@ $("#loadBtn").addEventListener("click", async () => {
 $("#submitBtn").addEventListener("click", async () => {
   try {
     const id = getIdentity();
+    if (verifiedStudentKey !== id.studentKey) await verifyPin(id);
     const apps = collectApplications();
     validateApplications(apps);
     const btn = $("#submitBtn");
     btn.disabled = true; btn.textContent = "저장 중...";
 
-    const oldQ = query(
-      collection(db, "applications"),
-      where("studentKey", "==", id.studentKey),
-      where("ownerUid", "==", currentUser.uid)
-    );
+    const oldQ = query(collection(db, "applications"), where("studentKey", "==", id.studentKey));
     const oldSnap = await getDocs(oldQ);
     const batch = writeBatch(db);
     oldSnap.forEach(d => batch.delete(d.ref));
@@ -201,6 +216,7 @@ $("#submitBtn").addEventListener("click", async () => {
       batch.set(ref, {
         ...id, ...a,
         ownerUid: currentUser.uid,
+        accessId: verifiedAccessId,
         normalizedUniversity: normalizeUniversity(a.university),
         normalizedDepartment: normalizeDepartment(a.department),
         normalizedAdmissionName: normalizeAdmission(a.admissionName),
@@ -223,3 +239,5 @@ $("#submitBtn").addEventListener("click", async () => {
 });
 
 applicationTemplate();
+
+["#classNo","#studentNo","#studentName","#studentPin"].forEach(sel=>{const el=document.querySelector(sel);["input","change"].forEach(evt=>el?.addEventListener(evt,()=>{verifiedStudentKey=null;verifiedAccessId=null;$("#loadStatus").textContent="";}));});

@@ -33,7 +33,7 @@
         </div>
       </div>
 
-      <div class="grid student-grid">
+      <div class="grid student-grid pin-grid">
         <label>반
           <select id="classNo">
             <option value="">선택</option>
@@ -47,10 +47,13 @@
         <label>이름
           <input id="studentName" placeholder="예: 홍길동" autocomplete="off" />
         </label>
+        <label>개인 PIN
+          <input id="studentPin" inputmode="numeric" maxlength="8" placeholder="교사가 안내한 8자리" autocomplete="one-time-code" />
+        </label>
       </div>
 
       <div class="inline-actions">
-        <button id="loadBtn" class="secondary">기존 지원정보 불러오기</button>
+        <button id="loadBtn" class="secondary">본인 확인 및 지원정보 불러오기</button>
         <span id="loadStatus" class="helper"></span>
       </div>
     </section>
@@ -70,7 +73,7 @@
 
     <section class="notice">
       <strong>개인정보 안내</strong>
-      <span>입력한 정보는 진학 상담 및 지원 중복 확인 목적으로 교사가 확인합니다. 다른 학생에게는 공개되지 않습니다.</span>
+      <span>입력한 정보는 진학 상담 및 지원 중복 확인 목적으로 교사가 확인합니다. 다른 학생에게는 공개되지 않습니다. 개인 PIN은 다른 학생과 공유하지 마세요.</span>
     </section>
 
     <div class="submit-bar">
