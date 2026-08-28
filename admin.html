@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>교사용 | 2027 수시지원 관리</title>
-  <link rel="stylesheet" href="./style.css?v=12.0" />
+  <link rel="stylesheet" href="./style.css?v=13.0" />
 </head>
 <body>
   <header class="topbar">
@@ -292,6 +292,43 @@
     </div>
   </div>
 
+
+  <div id="deleteStudentModal" class="modal-backdrop hidden" aria-hidden="true">
+    <div class="modal-card delete-student-modal" role="dialog" aria-modal="true" aria-labelledby="deleteStudentModalTitle">
+      <div class="modal-head">
+        <div>
+          <span class="eyebrow danger-eyebrow">최고관리자 전용</span>
+          <h2 id="deleteStudentModalTitle">학생 데이터 완전 삭제</h2>
+          <p class="helper">이 작업은 되돌릴 수 없습니다.</p>
+        </div>
+        <button id="deleteStudentCloseBtn" class="ghost small-btn" type="button">닫기</button>
+      </div>
+
+      <div class="delete-warning">
+        <strong id="deleteStudentNameLabel">학생</strong>의 다음 데이터를 모두 삭제합니다.
+        <ul>
+          <li>지원 대학·학과·전형 정보</li>
+          <li>지원정보 수정 이력</li>
+          <li>학생 명단 정보</li>
+          <li>PIN 인증정보</li>
+          <li>지원안 잠금 정보</li>
+          <li>학생 인증 세션</li>
+        </ul>
+      </div>
+
+      <label>삭제 확인을 위해 학생 이름을 입력하세요.
+        <input id="deleteStudentConfirmName" autocomplete="off" placeholder="학생 이름 입력" />
+      </label>
+
+      <div id="deleteStudentError" class="error-text"></div>
+
+      <div class="modal-actions">
+        <button id="deleteStudentCancelBtn" class="ghost" type="button">취소</button>
+        <button id="deleteStudentConfirmBtn" class="danger-button" type="button">완전 삭제</button>
+      </div>
+    </div>
+  </div>
+
   <div id="studentModal" class="modal-backdrop hidden" aria-hidden="true">
     <div class="modal-card student-detail-modal" role="dialog" aria-modal="true" aria-labelledby="studentModalTitle">
       <div class="modal-head">
@@ -303,6 +340,7 @@
           <div id="studentLockInfo" class="student-lock-info"></div>
         </div>
         <div class="modal-head-actions">
+          <button id="deleteStudentBtn" class="danger-button small-btn hidden" type="button">학생 데이터 삭제</button>
           <button id="lockBtn" class="secondary small-btn" type="button">지원안 잠금</button>
           <button id="historyBtn" class="secondary small-btn" type="button">수정 이력</button>
           <button id="studentModalCloseBtn" class="ghost small-btn" type="button">닫기</button>
@@ -356,6 +394,6 @@
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./admin.js?v=12.0"></script>
+  <script type="module" src="./admin.js?v=13.0"></script>
 </body>
 </html>

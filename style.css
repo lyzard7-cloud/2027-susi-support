@@ -144,3 +144,14 @@
 .teacher-class-row select{width:130px;padding:8px 9px}
 .admin-chip{display:inline-block;margin-left:7px;font-size:10px;font-weight:800;color:#315eb5;background:#edf3ff;border-radius:999px;padding:4px 7px}
 @media(max-width:700px){.myclass-bar{align-items:stretch;flex-direction:column}.myclass-actions button{flex:1}.teacher-class-row{align-items:stretch;flex-direction:column}.teacher-class-row select{width:100%}}
+
+.danger-button{border:1px solid #d65a5a;background:#c93636;color:#fff;border-radius:10px;padding:11px 15px;font:inherit;font-weight:800;cursor:pointer}
+.danger-button:hover{filter:brightness(.95)}
+.danger-button:disabled{opacity:.55;cursor:not-allowed}
+.danger-eyebrow{background:#fff0f0!important;color:#b73737!important}
+.delete-student-modal{width:min(520px,100%)}
+.delete-warning{border:1px solid #efc1c1;background:#fff6f6;border-radius:12px;padding:13px 15px;margin-bottom:16px;color:#6f3535;font-size:13px;line-height:1.6}
+.delete-warning strong{font-weight:850}
+.delete-warning ul{margin:8px 0 0 18px;padding:0}
+.delete-warning li{margin:3px 0}
+@media(max-width:650px){.delete-student-modal .modal-actions{flex-direction:column}.delete-student-modal .modal-actions button{width:100%}}
