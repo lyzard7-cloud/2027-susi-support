@@ -23,6 +23,40 @@ function toast(message) {
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
+function normalize(v = "") {
+  return String(v).toLowerCase().replace(/\s+/g, "").replace(/[()·ㆍ\-_.]/g, "");
+}
+function normalizeUniversity(v = "") {
+  let n = normalize(v);
+  if (n.endsWith("교육대학교")) n = n.slice(0, -"교육대학교".length) + "교대";
+  else if (n.endsWith("대학교")) n = n.slice(0, -"대학교".length);
+  else if (n.endsWith("대학")) n = n.slice(0, -"대학".length);
+  else if (n.endsWith("대") && !n.endsWith("교대")) n = n.slice(0, -1);
+  return n;
+}
+function normalizeDepartment(v = "") {
+  let n = normalize(v);
+  if (n.endsWith("학과")) n = n.slice(0, -"학과".length);
+  else if (n.endsWith("학부")) n = n.slice(0, -"학부".length);
+  return n;
+}
+function normalizeAdmission(v = "") {
+  let n = normalize(v);
+  if (n.endsWith("전형")) n = n.slice(0, -"전형".length);
+  return n;
+}
+function refreshComparisonKeys(row) {
+  return {
+    ...row,
+    universityKey: normalizeUniversity(row.university),
+    departmentKey: [normalizeUniversity(row.university), normalizeDepartment(row.department)].join("|"),
+    exactKey: [
+      normalizeUniversity(row.university),
+      normalizeDepartment(row.department),
+      normalizeAdmission(row.admissionName)
+    ].join("|")
+  };
+}
 function groupBy(key) {
   const m = new Map();
   rows.forEach(r => {
@@ -69,6 +103,32 @@ function renderStats() {
   $("#exactCount").textContent = groupBy("exactKey").length;
   $("#deptCount").textContent = groupBy("departmentKey").length;
 }
+function renderClassStatus() {
+  const host = $("#classStatusGrid");
+  const counts = {};
+  for (let i = 1; i <= 9; i++) counts[String(i)] = new Set();
+
+  rows.forEach(r => {
+    if (counts[r.classNo]) counts[r.classNo].add(r.studentKey);
+  });
+
+  host.innerHTML = Object.entries(counts).map(([classNo, set]) => `
+    <button type="button" class="class-status-item" data-class="${classNo}">
+      <span class="class-label">${classNo}반</span>
+      <strong>${set.size}</strong>
+      <small>명 입력</small>
+    </button>
+  `).join("");
+
+  host.querySelectorAll(".class-status-item").forEach(btn => {
+    btn.addEventListener("click", () => {
+      $("#filterClass").value = btn.dataset.class;
+      renderTable();
+      document.querySelector(".filters").scrollIntoView({behavior:"smooth", block:"center"});
+    });
+  });
+}
+
 function renderDuplicates() {
   const host = $("#duplicateGroups");
   const exactGroups = groupBy("exactKey").sort((a,b)=>b[1].length-a[1].length);
@@ -117,7 +177,10 @@ function renderTable() {
     </tr>`).join("") : `<tr><td colspan="6"><div class="empty">조건에 맞는 지원정보가 없습니다.</div></td></tr>`;
 }
 function render() {
-  renderStats(); renderDuplicates(); renderTable();
+  renderStats();
+  renderClassStatus();
+  renderDuplicates();
+  renderTable();
 }
 ["filterClass","filterType","viewMode"].forEach(id => $("#"+id).addEventListener("change", renderTable));
 $("#searchInput").addEventListener("input", renderTable);
@@ -138,7 +201,7 @@ onAuthStateChanged(auth, user => {
     $("#dashboard").classList.remove("hidden");
     if (unsubscribe) unsubscribe();
     unsubscribe = onSnapshot(collection(db, "applications"), snap => {
-      rows = snap.docs.map(d=>({id:d.id,...d.data()}));
+      rows = snap.docs.map(d=>refreshComparisonKeys({id:d.id,...d.data()}));
       $("#syncText").textContent = `실시간 동기화 중 · ${new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})} 기준`;
       render();
     }, err => {

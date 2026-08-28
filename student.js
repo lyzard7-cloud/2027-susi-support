@@ -39,6 +39,36 @@ function normalize(v = "") {
   return v.toLowerCase().replace(/\s+/g, "").replace(/[()·ㆍ\-_.]/g, "");
 }
 
+// 비교용 표준화: 학생이 입력한 원문은 그대로 저장하고,
+// 중복 탐지용 키만 표기 차이를 줄여서 생성합니다.
+function normalizeUniversity(v = "") {
+  let n = normalize(v);
+
+  // 흔한 대학 표기 차이 통일
+  if (n.endsWith("교육대학교")) n = n.slice(0, -"교육대학교".length) + "교대";
+  else if (n.endsWith("대학교")) n = n.slice(0, -"대학교".length);
+  else if (n.endsWith("대학")) n = n.slice(0, -"대학".length);
+  else if (n.endsWith("대") && !n.endsWith("교대")) n = n.slice(0, -1);
+
+  return n;
+}
+
+function normalizeDepartment(v = "") {
+  let n = normalize(v);
+
+  // 학과/학부 표기 차이를 비교용으로만 통일
+  if (n.endsWith("학과")) n = n.slice(0, -"학과".length);
+  else if (n.endsWith("학부")) n = n.slice(0, -"학부".length);
+
+  return n;
+}
+
+function normalizeAdmission(v = "") {
+  let n = normalize(v);
+  if (n.endsWith("전형")) n = n.slice(0, -"전형".length);
+  return n;
+}
+
 function studentKey() {
   const c = $("#classNo").value.trim();
   const n = $("#studentNo").value.trim().padStart(2, "0");
@@ -171,12 +201,12 @@ $("#submitBtn").addEventListener("click", async () => {
       batch.set(ref, {
         ...id, ...a,
         ownerUid: currentUser.uid,
-        normalizedUniversity: normalize(a.university),
-        normalizedDepartment: normalize(a.department),
-        normalizedAdmissionName: normalize(a.admissionName),
-        exactKey: [normalize(a.university), normalize(a.department), normalize(a.admissionName)].join("|"),
-        departmentKey: [normalize(a.university), normalize(a.department)].join("|"),
-        universityKey: normalize(a.university),
+        normalizedUniversity: normalizeUniversity(a.university),
+        normalizedDepartment: normalizeDepartment(a.department),
+        normalizedAdmissionName: normalizeAdmission(a.admissionName),
+        exactKey: [normalizeUniversity(a.university), normalizeDepartment(a.department), normalizeAdmission(a.admissionName)].join("|"),
+        departmentKey: [normalizeUniversity(a.university), normalizeDepartment(a.department)].join("|"),
+        universityKey: normalizeUniversity(a.university),
         updatedAt: serverTimestamp()
       });
     });
