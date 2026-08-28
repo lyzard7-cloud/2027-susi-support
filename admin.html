@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>교사용 | 2027 수시지원 관리</title>
-  <link rel="stylesheet" href="./style.css?v=9.0" />
+  <link rel="stylesheet" href="./style.css?v=10.0" />
 </head>
 <body>
   <header class="topbar">
@@ -105,6 +105,27 @@
         </button>
       </section>
 
+      <section class="result-summary-grid">
+        <button class="result-summary-card" data-result="">
+          <span>결과 전체</span><strong id="resultAllCount">0</strong><small>건</small>
+        </button>
+        <button class="result-summary-card success" data-result="최초합격">
+          <span>최초합격</span><strong id="resultFirstCount">0</strong><small>건</small>
+        </button>
+        <button class="result-summary-card wait" data-result="예비">
+          <span>예비</span><strong id="resultWaitCount">0</strong><small>건</small>
+        </button>
+        <button class="result-summary-card success" data-result="추가합격">
+          <span>추가합격</span><strong id="resultExtraCount">0</strong><small>건</small>
+        </button>
+        <button class="result-summary-card fail" data-result="불합격">
+          <span>불합격</span><strong id="resultFailCount">0</strong><small>건</small>
+        </button>
+        <button class="result-summary-card registered" data-result="최종등록">
+          <span>최종등록</span><strong id="resultRegisteredCount">0</strong><small>건</small>
+        </button>
+      </section>
+
 
 
       <section class="card class-status-card">
@@ -157,6 +178,19 @@
               <option>원서접수완료</option>
             </select>
           </label>
+          <label>합격결과
+            <select id="filterResult">
+              <option value="">전체 결과</option>
+              <option>미입력</option>
+              <option>1단계 합격</option>
+              <option>면접대상</option>
+              <option>최초합격</option>
+              <option>예비</option>
+              <option>추가합격</option>
+              <option>불합격</option>
+              <option>최종등록</option>
+            </select>
+          </label>
           <label>전형유형
             <select id="filterType">
               <option value="">전체</option>
@@ -192,7 +226,7 @@
             <table>
               <thead>
                 <tr>
-                  <th>학생</th><th>대학</th><th>학과</th><th>전형유형</th><th>전형명</th><th>상태</th>
+                  <th>학생</th><th>대학</th><th>학과</th><th>전형유형</th><th>전형명</th><th>상태</th><th>합격결과</th><th>예비번호</th>
                 </tr>
               </thead>
               <tbody id="applicationTable"></tbody>
@@ -212,8 +246,10 @@
           <h2 id="studentModalTitle">학생 지원현황</h2>
           <p id="studentModalSub" class="helper"></p>
           <div id="studentProgress" class="student-progress"></div>
+          <div id="studentLockInfo" class="student-lock-info"></div>
         </div>
         <div class="modal-head-actions">
+          <button id="lockBtn" class="secondary small-btn" type="button">지원안 잠금</button>
           <button id="historyBtn" class="secondary small-btn" type="button">수정 이력</button>
           <button id="studentModalCloseBtn" class="ghost small-btn" type="button">닫기</button>
         </div>
@@ -266,6 +302,6 @@
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./admin.js?v=9.0"></script>
+  <script type="module" src="./admin.js?v=10.0"></script>
 </body>
 </html>

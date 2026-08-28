@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import {
   getFirestore, collection, onSnapshot, writeBatch, doc, getDocs, serverTimestamp,
-  query, where, updateDoc, addDoc
+  query, where, updateDoc, addDoc, setDoc, getDoc, deleteDoc
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
@@ -37,7 +37,9 @@ let rows = [];
 let roster = [];
 let unsubscribe = null;
 let unsubscribeRoster = null;
+let unsubscribeLocks = null;
 let currentStudentModalKey = null;
+let lockMap = new Map();
 
 function toast(message) {
   toastEl.textContent = message;
@@ -150,6 +152,7 @@ function filteredRows() {
   const c = $("#filterClass").value;
   const type = $("#filterType").value;
   const status = $("#filterStatus").value;
+  const result = $("#filterResult").value;
   const q = $("#searchInput").value.trim().toLowerCase();
   const mode = $("#viewMode").value;
   const exact = duplicatesSet("exactKey");
@@ -160,7 +163,9 @@ function filteredRows() {
     if (c && r.classNo !== c) return false;
     if (type && r.admissionType !== type) return false;
     if (status && (r.status || "검토중") !== status) return false;
-    if (q && ![r.studentName,r.university,r.department,r.admissionType,r.admissionName,r.status].join(" ").toLowerCase().includes(q)) return false;
+    const resultValue = r.resultStatus || "미입력";
+    if (result && resultValue !== result) return false;
+    if (q && ![r.studentName,r.university,r.department,r.admissionType,r.admissionName,r.status,r.resultStatus,r.waitlistNo].join(" ").toLowerCase().includes(q)) return false;
     if (mode === "exact" && !exact.has(r.id)) return false;
     if (mode === "department" && !dept.has(r.id)) return false;
     if (mode === "university" && !uni.has(r.id)) return false;
@@ -179,6 +184,20 @@ function renderStats() {
   $("#exactCount").textContent = groupBy("exactKey").length;
   $("#deptCount").textContent = groupBy("departmentKey").length;
 }
+function renderResultSummary() {
+  const count = (result) => rows.filter(r => (r.resultStatus || "미입력") === result).length;
+  $("#resultAllCount").textContent = rows.length;
+  $("#resultFirstCount").textContent = count("최초합격");
+  $("#resultWaitCount").textContent = count("예비");
+  $("#resultExtraCount").textContent = count("추가합격");
+  $("#resultFailCount").textContent = count("불합격");
+  $("#resultRegisteredCount").textContent = count("최종등록");
+
+  document.querySelectorAll(".result-summary-card").forEach(btn => {
+    btn.classList.toggle("active", $("#filterResult").value === btn.dataset.result);
+  });
+}
+
 function renderStatusSummary() {
   const count = (status) => rows.filter(r => (r.status || "검토중") === status).length;
   $("#statusAllCount").textContent = rows.length;
@@ -286,6 +305,37 @@ function getStudentApplications(studentKey) {
     .sort((a,b)=>(a.priority||99)-(b.priority||99));
 }
 
+function isStudentLocked(studentKey) {
+  return lockMap.get(studentKey)?.locked === true;
+}
+
+async function toggleStudentLock(studentKey) {
+  if (!studentKey) return;
+  const currentlyLocked = isStudentLocked(studentKey);
+
+  try {
+    const ref = doc(db, "studentLocks", studentKey);
+    if (currentlyLocked) {
+      await setDoc(ref, {
+        locked: false,
+        updatedAt: serverTimestamp(),
+        updatedByUid: auth.currentUser?.uid || ""
+      });
+      toast("학생 지원안 잠금을 해제했습니다.");
+    } else {
+      await setDoc(ref, {
+        locked: true,
+        updatedAt: serverTimestamp(),
+        updatedByUid: auth.currentUser?.uid || ""
+      });
+      toast("학생 지원안을 잠갔습니다.");
+    }
+  } catch (e) {
+    console.error(e);
+    toast("잠금 상태 변경에 실패했습니다.");
+  }
+}
+
 function openStudentModal(studentKey) {
   currentStudentModalKey = studentKey;
   $("#historyPanel").classList.add("hidden");
@@ -296,6 +346,13 @@ function openStudentModal(studentKey) {
   const first = apps[0];
   $("#studentModalTitle").textContent = `${first.classNo}반 ${first.studentNo}번 ${first.studentName}`;
   $("#studentModalSub").textContent = `등록된 지원정보 ${apps.length}건`;
+  const locked = isStudentLocked(studentKey);
+  $("#lockBtn").textContent = locked ? "잠금 해제" : "지원안 잠금";
+  $("#lockBtn").classList.toggle("danger-outline", locked);
+  $("#studentLockInfo").innerHTML = locked
+    ? `<span class="lock-badge locked">🔒 학생 수정 잠금 상태</span>`
+    : `<span class="lock-badge">🔓 학생 수정 가능</span>`;
+
 
   const submittedCount = apps.filter(a => (a.status || "검토중") === "원서접수완료").length;
   const allSubmitted = apps.length > 0 && submittedCount === apps.length;
@@ -331,6 +388,16 @@ function openStudentModal(studentKey) {
               ).join("")}
             </select>
           </label>
+          <label>합격결과
+            <select class="teacher-result-select" data-id="${escapeHtml(a.id)}" data-student-key="${escapeHtml(a.studentKey)}" data-old-result="${escapeHtml(a.resultStatus || "미입력")}">
+              ${["미입력","1단계 합격","면접대상","최초합격","예비","추가합격","불합격","최종등록"].map(s =>
+                `<option value="${s}" ${(a.resultStatus || "미입력") === s ? "selected" : ""}>${s}</option>`
+              ).join("")}
+            </select>
+          </label>
+          <label>예비번호
+            <input class="teacher-waitlist-input" data-id="${escapeHtml(a.id)}" value="${escapeHtml(a.waitlistNo || "")}" placeholder="예: 14" ${a.resultStatus === "예비" ? "" : "disabled"} />
+          </label>
         </div>
         ${a.memo ? `<div class="student-app-memo">메모 · ${escapeHtml(a.memo)}</div>` : ""}
       </div>
@@ -347,6 +414,57 @@ function openStudentModal(studentKey) {
       setTimeout(() => {
         if (currentStudentModalKey === studentKey) openStudentModal(studentKey);
       }, 150);
+    });
+  });
+
+
+  $("#studentApplications").querySelectorAll(".teacher-result-select").forEach(select => {
+    select.addEventListener("change", async () => {
+      const oldResult = select.dataset.oldResult || "미입력";
+      const newResult = select.value;
+      const card = select.closest(".student-app-card");
+      const waitInput = card.querySelector(".teacher-waitlist-input");
+
+      if (newResult === "예비") {
+        waitInput.disabled = false;
+        waitInput.focus();
+      } else {
+        waitInput.value = "";
+        waitInput.disabled = true;
+      }
+
+      const ok = await changeApplicationResult(
+        select.dataset.id,
+        select.dataset.studentKey,
+        oldResult,
+        newResult,
+        waitInput.value,
+        select
+      );
+      if (ok) {
+        select.dataset.oldResult = newResult;
+        setTimeout(() => {
+          if (currentStudentModalKey === studentKey) openStudentModal(studentKey);
+        }, 150);
+      } else {
+        select.value = oldResult;
+      }
+    });
+  });
+
+  $("#studentApplications").querySelectorAll(".teacher-waitlist-input").forEach(input => {
+    input.addEventListener("change", async () => {
+      const card = input.closest(".student-app-card");
+      const select = card.querySelector(".teacher-result-select");
+      if (select.value !== "예비") return;
+      await changeApplicationResult(
+        input.dataset.id,
+        select.dataset.studentKey,
+        "예비",
+        "예비",
+        input.value,
+        input
+      );
     });
   });
 
@@ -414,6 +532,11 @@ async function loadStudentHistory(studentKey) {
   }
 }
 
+$("#lockBtn").addEventListener("click", async () => {
+  if (!currentStudentModalKey) return;
+  await toggleStudentLock(currentStudentModalKey);
+});
+
 $("#historyBtn").addEventListener("click", async () => {
   if (!currentStudentModalKey) return;
   const panel = $("#historyPanel");
@@ -429,6 +552,55 @@ $("#studentModalCloseBtn").addEventListener("click", closeStudentModal);
 $("#studentModal").addEventListener("click", (e) => {
   if (e.target === $("#studentModal")) closeStudentModal();
 });
+
+async function changeApplicationResult(applicationId, studentKey, oldResult, newResult, waitlistNo = "", controlEl = null) {
+  if (!applicationId || !studentKey) return false;
+  if (controlEl) controlEl.disabled = true;
+
+  try {
+    const application = rows.find(r => r.id === applicationId);
+    if (!application) throw new Error("지원정보를 찾을 수 없습니다.");
+
+    const payload = {
+      resultStatus: newResult,
+      updatedAt: serverTimestamp()
+    };
+
+    if (newResult === "예비") {
+      payload.waitlistNo = String(waitlistNo || "").trim();
+    } else {
+      payload.waitlistNo = "";
+    }
+
+    await updateDoc(doc(db, "applications", applicationId), payload);
+
+    await addDoc(collection(db, "applicationHistory"), {
+      studentKey,
+      classNo: application.classNo,
+      studentNo: application.studentNo,
+      studentName: application.studentName,
+      changes: [{
+        type: "수정",
+        priority: application.priority || 0,
+        text: `합격결과: ${oldResult || "미입력"} → ${newResult}${newResult === "예비" && payload.waitlistNo ? ` / 예비 ${payload.waitlistNo}번` : ""}`
+      }],
+      before: [],
+      after: [],
+      changedAt: serverTimestamp(),
+      changedByUid: auth.currentUser?.uid || "",
+      changedByTeacher: true
+    });
+
+    toast(`합격결과를 '${newResult}'로 변경했습니다.`);
+    return true;
+  } catch (e) {
+    console.error(e);
+    toast("합격결과 변경에 실패했습니다.");
+    return false;
+  } finally {
+    if (controlEl) controlEl.disabled = false;
+  }
+}
 
 async function changeApplicationStatus(applicationId, studentKey, oldStatus, newStatus, selectEl = null) {
   if (!applicationId || !studentKey) return false;
@@ -499,18 +671,30 @@ function renderTable() {
           ).join("")}
         </select>
       </td>
-    </tr>`).join("") : `<tr><td colspan="6"><div class="empty">조건에 맞는 지원정보가 없습니다.</div></td></tr>`;
+      <td>
+        <select class="table-result-select" data-id="${escapeHtml(r.id)}" data-student-key="${escapeHtml(r.studentKey)}" data-old-result="${escapeHtml(r.resultStatus || "미입력")}">
+          ${["미입력","1단계 합격","면접대상","최초합격","예비","추가합격","불합격","최종등록"].map(s =>
+            `<option value="${s}" ${(r.resultStatus || "미입력") === s ? "selected" : ""}>${s}</option>`
+          ).join("")}
+        </select>
+      </td>
+      <td>
+        <input class="table-waitlist-input" data-id="${escapeHtml(r.id)}" value="${escapeHtml(r.waitlistNo || "")}" placeholder="예: 14" ${r.resultStatus === "예비" ? "" : "disabled"} />
+      </td>
+    </tr>`).join("") : `<tr><td colspan="8"><div class="empty">조건에 맞는 지원정보가 없습니다.</div></td></tr>`;
 
 }
 function render() {
   renderStats();
   renderStatusSummary();
+  renderResultSummary();
   renderClassStatus();
   renderDuplicates();
   renderTable();
 }
-["filterClass","filterType","filterStatus","viewMode"].forEach(id => $("#"+id).addEventListener("change", () => {
+["filterClass","filterType","filterStatus","filterResult","viewMode"].forEach(id => $("#"+id).addEventListener("change", () => {
   renderStatusSummary();
+  renderResultSummary();
   renderTable();
 }));
 $("#searchInput").addEventListener("input", renderTable);
@@ -518,6 +702,14 @@ document.querySelectorAll(".status-summary-card").forEach(btn => {
   btn.addEventListener("click", () => {
     $("#filterStatus").value = btn.dataset.status || "";
     renderStatusSummary();
+    renderTable();
+    document.querySelector(".filters").scrollIntoView({behavior:"smooth", block:"center"});
+  });
+});
+document.querySelectorAll(".result-summary-card").forEach(btn => {
+  btn.addEventListener("click", () => {
+    $("#filterResult").value = btn.dataset.result || "";
+    renderResultSummary();
     renderTable();
     document.querySelector(".filters").scrollIntoView({behavior:"smooth", block:"center"});
   });
@@ -706,6 +898,19 @@ onAuthStateChanged(auth, user => {
     $("#dashboard").classList.remove("hidden");
     if (unsubscribe) unsubscribe();
     if (unsubscribeRoster) unsubscribeRoster();
+    if (unsubscribeLocks) unsubscribeLocks();
+
+    unsubscribeLocks = onSnapshot(collection(db, "studentLocks"), snap => {
+      lockMap = new Map(snap.docs.map(d => [d.id, d.data()]));
+      if (currentStudentModalKey) {
+        const locked = isStudentLocked(currentStudentModalKey);
+        $("#lockBtn").textContent = locked ? "잠금 해제" : "지원안 잠금";
+        $("#lockBtn").classList.toggle("danger-outline", locked);
+        $("#studentLockInfo").innerHTML = locked
+          ? `<span class="lock-badge locked">🔒 학생 수정 잠금 상태</span>`
+          : `<span class="lock-badge">🔓 학생 수정 가능</span>`;
+      }
+    });
 
     unsubscribeRoster = onSnapshot(collection(db, "students"), snap => {
       roster = snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>
@@ -730,6 +935,8 @@ onAuthStateChanged(auth, user => {
   } else {
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     if (unsubscribeRoster) { unsubscribeRoster(); unsubscribeRoster = null; }
+    if (unsubscribeLocks) { unsubscribeLocks(); unsubscribeLocks = null; }
+    lockMap = new Map();
     rows = [];
     roster = [];
     $("#dashboard").classList.add("hidden");

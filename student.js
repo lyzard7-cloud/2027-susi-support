@@ -183,14 +183,33 @@ $("#loadBtn").addEventListener("click", async () => {
     const rows = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.priority||99)-(b.priority||99));
     if (!rows.length) {
       applicationTemplate();
-      $("#loadStatus").textContent = "기존 정보가 없습니다. 새로 입력하세요.";
       loadedStudentKey = id.studentKey;
+      const locked = await getStudentLock(id.studentKey);
+      if (locked) {
+        document.querySelectorAll("#applications input, #applications select, #applications button.remove-btn, #addApplicationBtn").forEach(el => el.disabled = true);
+        $("#submitBtn").disabled = true;
+        $("#loadStatus").textContent = "현재 담임교사가 지원안을 잠근 상태입니다.";
+      } else {
+        $("#loadStatus").textContent = "기존 정보가 없습니다. 새로 입력하세요.";
+      }
       return;
     }
     rows.forEach(applicationTemplate);
     loadedStudentKey = id.studentKey;
-    $("#loadStatus").textContent = `${rows.length}건의 기존 지원정보를 불러왔습니다.`;
-    toast("기존 지원정보를 불러왔습니다.");
+
+    const locked = await getStudentLock(id.studentKey);
+    document.querySelectorAll("#applications input, #applications select, #applications button.remove-btn, #addApplicationBtn").forEach(el => {
+      el.disabled = locked;
+    });
+    $("#submitBtn").disabled = locked;
+
+    if (locked) {
+      $("#loadStatus").textContent = `${rows.length}건을 불러왔습니다. 현재 담임교사가 지원안을 잠근 상태입니다.`;
+      toast("지원안이 잠겨 있어 학생은 수정할 수 없습니다.");
+    } else {
+      $("#loadStatus").textContent = `${rows.length}건의 기존 지원정보를 불러왔습니다.`;
+      toast("기존 지원정보를 불러왔습니다.");
+    }
   } catch (e) {
     $("#loadStatus").textContent = "";
     toast(e.message || "조회 중 오류가 발생했습니다.");

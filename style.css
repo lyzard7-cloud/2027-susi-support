@@ -94,3 +94,23 @@
 .student-app-actions label{max-width:220px;font-size:11px}
 .teacher-status-select{padding:8px 9px;font-size:12px}
 @media(max-width:650px){.progress-summary{min-width:0}.table-status-select{min-width:118px}}
+
+.result-summary-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:18px}
+.result-summary-card{border:1px solid var(--line);background:#fff;border-radius:14px;padding:14px 12px;box-shadow:var(--shadow);text-align:left;color:var(--text);display:block}
+.result-summary-card span{display:block;font-size:11px;color:var(--muted)}
+.result-summary-card strong{display:inline-block;font-size:23px;margin-top:7px}
+.result-summary-card small{margin-left:3px;color:var(--muted)}
+.result-summary-card:hover,.result-summary-card.active{border-color:#9db6ef;background:#f5f8ff}
+.result-summary-card.success{background:#f3fbf5;border-color:#c8e3cf}
+.result-summary-card.wait{background:#fffaf0;border-color:#efd8aa}
+.result-summary-card.fail{background:#fff7f7;border-color:#efcaca}
+.result-summary-card.registered{background:#eef5ff;border-color:#bdd2f3}
+.table-result-select{min-width:118px;padding:8px 9px;font-size:12px;font-weight:700}
+.table-waitlist-input{width:82px;padding:8px 9px;font-size:12px}
+.student-app-actions{display:grid;grid-template-columns:1fr 1fr .8fr;gap:9px}
+.student-lock-info{margin-top:8px}
+.lock-badge{display:inline-flex;align-items:center;gap:5px;background:#f4f6f9;border:1px solid var(--line);border-radius:999px;padding:5px 8px;font-size:11px;color:#5d6878}
+.lock-badge.locked{background:#fff1f1;border-color:#f0c2c2;color:#a43d3d}
+.danger-outline{border-color:#e1aaaa!important;color:#a83c3c!important;background:#fff7f7!important}
+@media(max-width:1000px){.result-summary-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:650px){.result-summary-grid{grid-template-columns:repeat(2,1fr)}.student-app-actions{grid-template-columns:1fr}}
