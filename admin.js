@@ -40,6 +40,8 @@ let unsubscribeRoster = null;
 let unsubscribeLocks = null;
 let currentStudentModalKey = null;
 let lockMap = new Map();
+let duplicateReviewMap = new Map();
+let unsubscribeDuplicateReviews = null;
 
 function toast(message) {
   toastEl.textContent = message;
@@ -71,6 +73,24 @@ function normalizeAdmission(v = "") {
   if (n.endsWith("전형")) n = n.slice(0, -"전형".length);
   return n;
 }
+function stableHash(text = "") {
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+function duplicateReviewId(type, key) {
+  return `${type}_${stableHash(key)}`;
+}
+function getDuplicateReview(type, key) {
+  return duplicateReviewMap.get(duplicateReviewId(type, key)) || {
+    status: "미검토",
+    memo: ""
+  };
+}
+
 function refreshComparisonKeys(row) {
   return {
     ...row,
@@ -183,6 +203,14 @@ function renderStats() {
   $("#applicationCount").textContent = rows.length;
   $("#exactCount").textContent = groupBy("exactKey").length;
   $("#deptCount").textContent = groupBy("departmentKey").length;
+
+  const exactGroups = groupBy("exactKey").map(([key]) => ["exact", key]);
+  const deptGroups = groupBy("departmentKey").map(([key]) => ["department", key]);
+  const unresolved = [...exactGroups, ...deptGroups].filter(([type, key]) => {
+    const status = getDuplicateReview(type, key).status || "미검토";
+    return status === "미검토" || status === "협의중";
+  }).length;
+  $("#unresolvedDupCount").textContent = unresolved;
 }
 function renderResultSummary() {
   const count = (result) => rows.filter(r => (r.resultStatus || "미입력") === result).length;
@@ -265,388 +293,126 @@ function renderClassStatus() {
   });
 }
 
-function renderDuplicates() {
-  const host = $("#duplicateGroups");
-  const exactGroups = groupBy("exactKey").sort((a,b)=>b[1].length-a[1].length);
-  const exactKeys = new Set(exactGroups.map(x=>x[0]));
-  const deptGroups = groupBy("departmentKey").filter(([k]) => {
-    const related = rows.filter(r=>r.departmentKey===k);
-    return new Set(related.map(r=>r.exactKey)).size > 1;
-  }).sort((a,b)=>b[1].length-a[1].length);
-
-  const cards = [];
-  exactGroups.forEach(([,g]) => {
-    const first = g[0];
-    const people = [...new Map(g.map(x=>[x.studentKey,x])).values()];
-    cards.push(`
-      <div class="dup-card exact">
-        <div class="dup-tag">🔴 완전 중복 · ${people.length}명</div>
-        <div class="dup-title">${escapeHtml(first.university)} · ${escapeHtml(first.department)}</div>
-        <div class="dup-sub">${escapeHtml(first.admissionName)} / ${escapeHtml(first.admissionType)}</div>
-        <div class="dup-people">${people.map(x=>`<span class="person-chip">${escapeHtml(x.classNo)}반 ${escapeHtml(x.studentName)}</span>`).join("")}</div>
-      </div>`);
-  });
-  deptGroups.forEach(([,g]) => {
-    const first = g[0];
-    const people = [...new Map(g.map(x=>[x.studentKey,x])).values()];
-    cards.push(`
-      <div class="dup-card department">
-        <div class="dup-tag">🟠 동일 대학·학과 · ${people.length}명</div>
-        <div class="dup-title">${escapeHtml(first.university)} · ${escapeHtml(first.department)}</div>
-        <div class="dup-sub">전형이 서로 다르므로 확인이 필요합니다.</div>
-        <div class="dup-people">${people.map(x=>`<span class="person-chip">${escapeHtml(x.classNo)}반 ${escapeHtml(x.studentName)} · ${escapeHtml(x.admissionName)}</span>`).join("")}</div>
-      </div>`);
-  });
-  host.innerHTML = cards.length ? cards.join("") : `<div class="empty">현재 탐지된 중복지원 그룹이 없습니다.</div>`;
-}
-function getStudentApplications(studentKey) {
-  return rows
-    .filter(r => r.studentKey === studentKey)
-    .sort((a,b)=>(a.priority||99)-(b.priority||99));
-}
-
-function isStudentLocked(studentKey) {
-  return lockMap.get(studentKey)?.locked === true;
-}
-
-async function toggleStudentLock(studentKey) {
-  if (!studentKey) return;
-  const currentlyLocked = isStudentLocked(studentKey);
-
-  try {
-    const ref = doc(db, "studentLocks", studentKey);
-    if (currentlyLocked) {
-      await setDoc(ref, {
-        locked: false,
-        updatedAt: serverTimestamp(),
-        updatedByUid: auth.currentUser?.uid || ""
-      });
-      toast("학생 지원안 잠금을 해제했습니다.");
-    } else {
-      await setDoc(ref, {
-        locked: true,
-        updatedAt: serverTimestamp(),
-        updatedByUid: auth.currentUser?.uid || ""
-      });
-      toast("학생 지원안을 잠갔습니다.");
-    }
-  } catch (e) {
-    console.error(e);
-    toast("잠금 상태 변경에 실패했습니다.");
-  }
-}
-
-function openStudentModal(studentKey) {
-  currentStudentModalKey = studentKey;
-  $("#historyPanel").classList.add("hidden");
-  $("#historyList").innerHTML = "";
-  const apps = getStudentApplications(studentKey);
-  if (!apps.length) return toast("해당 학생의 지원정보가 없습니다.");
-
-  const first = apps[0];
-  $("#studentModalTitle").textContent = `${first.classNo}반 ${first.studentNo}번 ${first.studentName}`;
-  $("#studentModalSub").textContent = `등록된 지원정보 ${apps.length}건`;
-  const locked = isStudentLocked(studentKey);
-  $("#lockBtn").textContent = locked ? "잠금 해제" : "지원안 잠금";
-  $("#lockBtn").classList.toggle("danger-outline", locked);
-  $("#studentLockInfo").innerHTML = locked
-    ? `<span class="lock-badge locked">🔒 학생 수정 잠금 상태</span>`
-    : `<span class="lock-badge">🔓 학생 수정 가능</span>`;
-
-
-  const submittedCount = apps.filter(a => (a.status || "검토중") === "원서접수완료").length;
-  const allSubmitted = apps.length > 0 && submittedCount === apps.length;
-  const progressPercent = apps.length ? Math.round((submittedCount / apps.length) * 100) : 0;
-
-  $("#studentProgress").innerHTML = `
-    <div class="progress-summary ${allSubmitted ? "complete" : ""}">
-      <div class="progress-summary-top">
-        <span>${allSubmitted ? "✅ 전체 접수 완료" : "원서접수 진행률"}</span>
-        <strong>${submittedCount}/${apps.length}</strong>
+function duplicateReviewControls(type, key) {
+  const review = getDuplicateReview(type, key);
+  const id = duplicateReviewId(type, key);
+  return `
+    <div class="dup-review">
+      <div class="dup-review-row">
+        <label>협의상태
+          <select class="dup-review-status" data-review-id="${id}" data-type="${type}" data-key="${escapeHtml(key)}">
+            ${["미검토","협의중","조정완료","중복허용"].map(s =>
+              `<option value="${s}" ${review.status === s ? "selected" : ""}>${s}</option>`
+            ).join("")}
+          </select>
+        </label>
+        <label class="dup-review-memo-label">교사 메모
+          <input class="dup-review-memo" data-review-id="${id}" value="${escapeHtml(review.memo || "")}" placeholder="예: 3반·5반 담임 협의 예정" />
+        </label>
+        <button type="button" class="secondary dup-review-save"
+          data-review-id="${id}" data-type="${type}" data-key="${escapeHtml(key)}">저장</button>
       </div>
-      <div class="progress-track"><span style="width:${progressPercent}%"></span></div>
-      <small>${progressPercent}% 완료</small>
+      ${review.updatedByEmail ? `<div class="dup-review-updated">최근 저장: ${escapeHtml(review.updatedByEmail)}</div>` : ""}
     </div>
   `;
-
-  $("#studentApplications").innerHTML = apps.map((a, index) => `
-    <article class="student-app-card">
-      <div class="student-app-number">${escapeHtml(a.priority || index + 1)}</div>
-      <div class="student-app-main">
-        <div class="student-app-university">${escapeHtml(a.university)}</div>
-        <div class="student-app-department">${escapeHtml(a.department)}</div>
-        <div class="student-app-meta">
-          <span>${escapeHtml(a.admissionType)}</span>
-          <span>${escapeHtml(a.admissionName)}</span>
-          <span class="status-pill ${statusClass(a.status)}">${escapeHtml(a.status || "검토중")}</span>
-        </div>
-        <div class="student-app-actions">
-          <label>교사 상태 변경
-            <select class="teacher-status-select" data-id="${escapeHtml(a.id)}" data-student-key="${escapeHtml(a.studentKey)}">
-              ${["검토중","담임확인","최종결정","원서접수완료"].map(s =>
-                `<option value="${s}" ${(a.status || "검토중") === s ? "selected" : ""}>${s}</option>`
-              ).join("")}
-            </select>
-          </label>
-          <label>합격결과
-            <select class="teacher-result-select" data-id="${escapeHtml(a.id)}" data-student-key="${escapeHtml(a.studentKey)}" data-old-result="${escapeHtml(a.resultStatus || "미입력")}">
-              ${["미입력","1단계 합격","면접대상","최초합격","예비","추가합격","불합격","최종등록"].map(s =>
-                `<option value="${s}" ${(a.resultStatus || "미입력") === s ? "selected" : ""}>${s}</option>`
-              ).join("")}
-            </select>
-          </label>
-          <label>예비번호
-            <input class="teacher-waitlist-input" data-id="${escapeHtml(a.id)}" value="${escapeHtml(a.waitlistNo || "")}" placeholder="예: 14" ${a.resultStatus === "예비" ? "" : "disabled"} />
-          </label>
-        </div>
-        ${a.memo ? `<div class="student-app-memo">메모 · ${escapeHtml(a.memo)}</div>` : ""}
-      </div>
-    </article>
-  `).join("");
-
-  $("#studentApplications").querySelectorAll(".teacher-status-select").forEach(select => {
-    select.addEventListener("change", async () => {
-      const oldStatus = getStudentApplications(studentKey).find(x => x.id === select.dataset.id)?.status || "검토중";
-      const newStatus = select.value;
-      if (oldStatus === newStatus) return;
-      await changeApplicationStatus(select.dataset.id, select.dataset.studentKey, oldStatus, newStatus, select);
-      // 실시간 반영 후 모달 진행률도 최신 상태로 갱신
-      setTimeout(() => {
-        if (currentStudentModalKey === studentKey) openStudentModal(studentKey);
-      }, 150);
-    });
-  });
-
-
-  $("#studentApplications").querySelectorAll(".teacher-result-select").forEach(select => {
-    select.addEventListener("change", async () => {
-      const oldResult = select.dataset.oldResult || "미입력";
-      const newResult = select.value;
-      const card = select.closest(".student-app-card");
-      const waitInput = card.querySelector(".teacher-waitlist-input");
-
-      if (newResult === "예비") {
-        waitInput.disabled = false;
-        waitInput.focus();
-      } else {
-        waitInput.value = "";
-        waitInput.disabled = true;
-      }
-
-      const ok = await changeApplicationResult(
-        select.dataset.id,
-        select.dataset.studentKey,
-        oldResult,
-        newResult,
-        waitInput.value,
-        select
-      );
-      if (ok) {
-        select.dataset.oldResult = newResult;
-        setTimeout(() => {
-          if (currentStudentModalKey === studentKey) openStudentModal(studentKey);
-        }, 150);
-      } else {
-        select.value = oldResult;
-      }
-    });
-  });
-
-  $("#studentApplications").querySelectorAll(".teacher-waitlist-input").forEach(input => {
-    input.addEventListener("change", async () => {
-      const card = input.closest(".student-app-card");
-      const select = card.querySelector(".teacher-result-select");
-      if (select.value !== "예비") return;
-      await changeApplicationResult(
-        input.dataset.id,
-        select.dataset.studentKey,
-        "예비",
-        "예비",
-        input.value,
-        input
-      );
-    });
-  });
-
-  $("#studentModal").classList.remove("hidden");
-  $("#studentModal").setAttribute("aria-hidden", "false");
 }
 
-function closeStudentModal() {
-  currentStudentModalKey = null;
-  $("#historyPanel").classList.add("hidden");
-  $("#historyList").innerHTML = "";
-  $("#studentModal").classList.add("hidden");
-  $("#studentModal").setAttribute("aria-hidden", "true");
-  $("#studentApplications").innerHTML = "";
-}
+async function saveDuplicateReview(button) {
+  const id = button.dataset.reviewId;
+  const type = button.dataset.type;
+  const key = button.dataset.key;
+  const card = button.closest(".dup-card");
+  const status = card.querySelector(".dup-review-status").value;
+  const memo = card.querySelector(".dup-review-memo").value.trim();
 
-async function loadStudentHistory(studentKey) {
-  if (!studentKey) return;
-  const host = $("#historyList");
-  host.innerHTML = `<div class="empty">수정 이력을 불러오는 중입니다.</div>`;
+  button.disabled = true;
+  button.textContent = "저장 중...";
 
   try {
-    const q = query(
-      collection(db, "applicationHistory"),
-      where("studentKey", "==", studentKey)
-    );
-    const snap = await getDocs(q);
-    const list = snap.docs.map(d => ({id:d.id, ...d.data()}))
-      .sort((a,b) => {
-        const at = a.changedAt?.toMillis?.() || 0;
-        const bt = b.changedAt?.toMillis?.() || 0;
-        return bt - at;
-      });
-
-    if (!list.length) {
-      host.innerHTML = `<div class="empty">아직 기록된 수정 이력이 없습니다.</div>`;
-      return;
-    }
-
-    host.innerHTML = list.map(item => {
-      const date = item.changedAt?.toDate?.();
-      const dateText = date
-        ? date.toLocaleString("ko-KR", {year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})
-        : "시간 정보 없음";
-      const changes = Array.isArray(item.changes) ? item.changes : [];
-
-      return `<article class="history-item">
-        <div class="history-date">${escapeHtml(dateText)}</div>
-        <div class="history-changes">
-          ${changes.length ? changes.map(c => `
-            <div class="history-change">
-              <span class="history-type ${c.type === "삭제" ? "delete" : c.type === "추가" ? "add" : "edit"}">${escapeHtml(c.type)}</span>
-              <div>
-                <strong>지원 ${escapeHtml(c.priority)}</strong>
-                <p>${escapeHtml(c.text)}</p>
-              </div>
-            </div>
-          `).join("") : `<span class="helper">변경 상세정보가 없습니다.</span>`}
-        </div>
-      </article>`;
-    }).join("");
+    await setDoc(doc(db, "duplicateReviews", id), {
+      groupType: type,
+      groupKey: key,
+      status,
+      memo,
+      updatedAt: serverTimestamp(),
+      updatedByUid: auth.currentUser?.uid || "",
+      updatedByEmail: auth.currentUser?.email || ""
+    }, {merge:true});
+    toast("중복지원 협의상태를 저장했습니다.");
   } catch (e) {
     console.error(e);
-    host.innerHTML = `<div class="empty">수정 이력을 불러오지 못했습니다. Firestore 규칙을 확인해 주세요.</div>`;
-  }
-}
-
-$("#lockBtn").addEventListener("click", async () => {
-  if (!currentStudentModalKey) return;
-  await toggleStudentLock(currentStudentModalKey);
-});
-
-$("#historyBtn").addEventListener("click", async () => {
-  if (!currentStudentModalKey) return;
-  const panel = $("#historyPanel");
-  const opening = panel.classList.contains("hidden");
-  panel.classList.toggle("hidden");
-  if (opening) {
-    await loadStudentHistory(currentStudentModalKey);
-    panel.scrollIntoView({behavior:"smooth", block:"nearest"});
-  }
-});
-
-$("#studentModalCloseBtn").addEventListener("click", closeStudentModal);
-$("#studentModal").addEventListener("click", (e) => {
-  if (e.target === $("#studentModal")) closeStudentModal();
-});
-
-async function changeApplicationResult(applicationId, studentKey, oldResult, newResult, waitlistNo = "", controlEl = null) {
-  if (!applicationId || !studentKey) return false;
-  if (controlEl) controlEl.disabled = true;
-
-  try {
-    const application = rows.find(r => r.id === applicationId);
-    if (!application) throw new Error("지원정보를 찾을 수 없습니다.");
-
-    const payload = {
-      resultStatus: newResult,
-      updatedAt: serverTimestamp()
-    };
-
-    if (newResult === "예비") {
-      payload.waitlistNo = String(waitlistNo || "").trim();
-    } else {
-      payload.waitlistNo = "";
-    }
-
-    await updateDoc(doc(db, "applications", applicationId), payload);
-
-    await addDoc(collection(db, "applicationHistory"), {
-      studentKey,
-      classNo: application.classNo,
-      studentNo: application.studentNo,
-      studentName: application.studentName,
-      changes: [{
-        type: "수정",
-        priority: application.priority || 0,
-        text: `합격결과: ${oldResult || "미입력"} → ${newResult}${newResult === "예비" && payload.waitlistNo ? ` / 예비 ${payload.waitlistNo}번` : ""}`
-      }],
-      before: [],
-      after: [],
-      changedAt: serverTimestamp(),
-      changedByUid: auth.currentUser?.uid || "",
-      changedByTeacher: true
-    });
-
-    toast(`합격결과를 '${newResult}'로 변경했습니다.`);
-    return true;
-  } catch (e) {
-    console.error(e);
-    toast("합격결과 변경에 실패했습니다.");
-    return false;
+    toast("협의상태 저장에 실패했습니다.");
   } finally {
-    if (controlEl) controlEl.disabled = false;
+    button.disabled = false;
+    button.textContent = "저장";
   }
 }
 
-async function changeApplicationStatus(applicationId, studentKey, oldStatus, newStatus, selectEl = null) {
-  if (!applicationId || !studentKey) return false;
+function renderDuplicates() {
+  const host = $("#duplicateGroups");
+  const reviewFilter = $("#filterDuplicateReview")?.value || "";
 
-  if (selectEl) {
-    selectEl.disabled = true;
-  }
+  const exactGroups = groupBy("exactKey")
+    .sort((a,b)=>b[1].length-a[1].length);
 
-  try {
-    const application = rows.find(r => r.id === applicationId);
-    if (!application) throw new Error("지원정보를 찾을 수 없습니다.");
+  const deptGroups = groupBy("departmentKey")
+    .filter(([k]) => {
+      const related = rows.filter(r=>r.departmentKey===k);
+      return new Set(related.map(r=>r.exactKey)).size > 1;
+    })
+    .sort((a,b)=>b[1].length-a[1].length);
 
-    await updateDoc(doc(db, "applications", applicationId), {
-      status: newStatus,
-      updatedAt: serverTimestamp()
-    });
+  const cards = [];
 
-    // 교사가 상태를 바꾼 사실도 수정 이력에 기록
-    await addDoc(collection(db, "applicationHistory"), {
-      studentKey,
-      classNo: application.classNo,
-      studentNo: application.studentNo,
-      studentName: application.studentName,
-      changes: [{
-        type: "수정",
-        priority: application.priority || 0,
-        text: `상태: ${oldStatus} → ${newStatus}`
-      }],
-      before: [],
-      after: [],
-      changedAt: serverTimestamp(),
-      changedByUid: auth.currentUser?.uid || "",
-      changedByTeacher: true
-    });
+  exactGroups.forEach(([key,g]) => {
+    const review = getDuplicateReview("exact", key);
+    if (reviewFilter && review.status !== reviewFilter) return;
 
-    toast(`지원상태를 '${newStatus}'로 변경했습니다.`);
-    return true;
-  } catch (e) {
-    console.error(e);
-    toast("지원상태 변경에 실패했습니다. 권한이나 네트워크를 확인해 주세요.");
-    return false;
-  } finally {
-    if (selectEl) {
-      selectEl.disabled = false;
-    }
-  }
+    const first = g[0];
+    const people = [...new Map(g.map(x=>[x.studentKey,x])).values()];
+    cards.push(`
+      <div class="dup-card exact ${review.status === "조정완료" || review.status === "중복허용" ? "resolved" : ""}">
+        <div class="dup-card-top">
+          <div>
+            <div class="dup-tag">🔴 완전 중복 · ${people.length}명</div>
+            <div class="dup-title">${escapeHtml(first.university)} · ${escapeHtml(first.department)}</div>
+            <div class="dup-sub">${escapeHtml(first.admissionName)} / ${escapeHtml(first.admissionType)}</div>
+          </div>
+          <span class="dup-review-badge status-${review.status}">${escapeHtml(review.status)}</span>
+        </div>
+        <div class="dup-people">${people.map(x=>`<span class="person-chip">${escapeHtml(x.classNo)}반 ${escapeHtml(x.studentName)}</span>`).join("")}</div>
+        ${duplicateReviewControls("exact", key)}
+      </div>`);
+  });
+
+  deptGroups.forEach(([key,g]) => {
+    const review = getDuplicateReview("department", key);
+    if (reviewFilter && review.status !== reviewFilter) return;
+
+    const first = g[0];
+    const people = [...new Map(g.map(x=>[x.studentKey,x])).values()];
+    cards.push(`
+      <div class="dup-card department ${review.status === "조정완료" || review.status === "중복허용" ? "resolved" : ""}">
+        <div class="dup-card-top">
+          <div>
+            <div class="dup-tag">🟠 동일 대학·학과 · ${people.length}명</div>
+            <div class="dup-title">${escapeHtml(first.university)} · ${escapeHtml(first.department)}</div>
+            <div class="dup-sub">전형이 서로 다르므로 확인이 필요합니다.</div>
+          </div>
+          <span class="dup-review-badge status-${review.status}">${escapeHtml(review.status)}</span>
+        </div>
+        <div class="dup-people">${people.map(x=>`<span class="person-chip">${escapeHtml(x.classNo)}반 ${escapeHtml(x.studentName)} · ${escapeHtml(x.admissionName)}</span>`).join("")}</div>
+        ${duplicateReviewControls("department", key)}
+      </div>`);
+  });
+
+  host.innerHTML = cards.length
+    ? cards.join("")
+    : `<div class="empty">${reviewFilter ? `'${escapeHtml(reviewFilter)}' 상태의 중복지원 그룹이 없습니다.` : "현재 탐지된 중복지원 그룹이 없습니다."}</div>`;
+
+  host.querySelectorAll(".dup-review-save").forEach(btn => {
+    btn.addEventListener("click", () => saveDuplicateReview(btn));
+  });
 }
 
 function renderTable() {
@@ -698,6 +464,9 @@ function render() {
   renderTable();
 }));
 $("#searchInput").addEventListener("input", renderTable);
+$("#filterDuplicateReview").addEventListener("change", () => {
+  renderDuplicates();
+});
 document.querySelectorAll(".status-summary-card").forEach(btn => {
   btn.addEventListener("click", () => {
     $("#filterStatus").value = btn.dataset.status || "";
@@ -899,6 +668,15 @@ onAuthStateChanged(auth, user => {
     if (unsubscribe) unsubscribe();
     if (unsubscribeRoster) unsubscribeRoster();
     if (unsubscribeLocks) unsubscribeLocks();
+    if (unsubscribeDuplicateReviews) unsubscribeDuplicateReviews();
+
+    unsubscribeDuplicateReviews = onSnapshot(collection(db, "duplicateReviews"), snap => {
+      duplicateReviewMap = new Map(snap.docs.map(d => [d.id, {id:d.id, ...d.data()}]));
+      renderStats();
+      renderDuplicates();
+    }, err => {
+      console.error(err);
+    });
 
     unsubscribeLocks = onSnapshot(collection(db, "studentLocks"), snap => {
       lockMap = new Map(snap.docs.map(d => [d.id, d.data()]));
@@ -936,7 +714,9 @@ onAuthStateChanged(auth, user => {
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     if (unsubscribeRoster) { unsubscribeRoster(); unsubscribeRoster = null; }
     if (unsubscribeLocks) { unsubscribeLocks(); unsubscribeLocks = null; }
+    if (unsubscribeDuplicateReviews) { unsubscribeDuplicateReviews(); unsubscribeDuplicateReviews = null; }
     lockMap = new Map();
+    duplicateReviewMap = new Map();
     rows = [];
     roster = [];
     $("#dashboard").classList.add("hidden");

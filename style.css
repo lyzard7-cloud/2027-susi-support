@@ -114,3 +114,19 @@
 .danger-outline{border-color:#e1aaaa!important;color:#a83c3c!important;background:#fff7f7!important}
 @media(max-width:1000px){.result-summary-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:650px){.result-summary-grid{grid-template-columns:repeat(2,1fr)}.student-app-actions{grid-template-columns:1fr}}
+
+.stat-card.review{border-color:#c9d5e8;background:#f7f9fd}
+.dup-card-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.dup-card.resolved{opacity:.72;background:#f8fafc;border-color:#dce2ea}
+.dup-review-badge{flex:0 0 auto;font-size:10px;font-weight:850;border-radius:999px;padding:5px 8px;background:#eef2f7;color:#536071}
+.dup-review-badge.status-미검토{background:#fff0f0;color:#b73737}
+.dup-review-badge.status-협의중{background:#fff5df;color:#956100}
+.dup-review-badge.status-조정완료{background:#eaf8ef;color:#247a42}
+.dup-review-badge.status-중복허용{background:#edf3ff;color:#315eb5}
+.dup-review{border-top:1px dashed var(--line);margin-top:12px;padding-top:12px}
+.dup-review-row{display:grid;grid-template-columns:125px minmax(180px,1fr) 64px;gap:8px;align-items:end}
+.dup-review-row label{font-size:10px;gap:4px}
+.dup-review-row select,.dup-review-row input{padding:8px 9px;font-size:11px}
+.dup-review-save{padding:9px 10px;font-size:11px}
+.dup-review-updated{font-size:10px;color:var(--muted);margin-top:6px}
+@media(max-width:700px){.dup-review-row{grid-template-columns:1fr}.dup-review-save{width:100%}.dup-card-top{flex-direction:column}.dup-review-badge{align-self:flex-start}}
