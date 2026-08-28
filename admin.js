@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import {
   getFirestore, collection, onSnapshot, writeBatch, doc, getDocs, serverTimestamp,
-  query, where
+  query, where, updateDoc, addDoc
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
@@ -297,6 +297,21 @@ function openStudentModal(studentKey) {
   $("#studentModalTitle").textContent = `${first.classNo}반 ${first.studentNo}번 ${first.studentName}`;
   $("#studentModalSub").textContent = `등록된 지원정보 ${apps.length}건`;
 
+  const submittedCount = apps.filter(a => (a.status || "검토중") === "원서접수완료").length;
+  const allSubmitted = apps.length > 0 && submittedCount === apps.length;
+  const progressPercent = apps.length ? Math.round((submittedCount / apps.length) * 100) : 0;
+
+  $("#studentProgress").innerHTML = `
+    <div class="progress-summary ${allSubmitted ? "complete" : ""}">
+      <div class="progress-summary-top">
+        <span>${allSubmitted ? "✅ 전체 접수 완료" : "원서접수 진행률"}</span>
+        <strong>${submittedCount}/${apps.length}</strong>
+      </div>
+      <div class="progress-track"><span style="width:${progressPercent}%"></span></div>
+      <small>${progressPercent}% 완료</small>
+    </div>
+  `;
+
   $("#studentApplications").innerHTML = apps.map((a, index) => `
     <article class="student-app-card">
       <div class="student-app-number">${escapeHtml(a.priority || index + 1)}</div>
@@ -308,10 +323,32 @@ function openStudentModal(studentKey) {
           <span>${escapeHtml(a.admissionName)}</span>
           <span class="status-pill ${statusClass(a.status)}">${escapeHtml(a.status || "검토중")}</span>
         </div>
+        <div class="student-app-actions">
+          <label>교사 상태 변경
+            <select class="teacher-status-select" data-id="${escapeHtml(a.id)}" data-student-key="${escapeHtml(a.studentKey)}">
+              ${["검토중","담임확인","최종결정","원서접수완료"].map(s =>
+                `<option value="${s}" ${(a.status || "검토중") === s ? "selected" : ""}>${s}</option>`
+              ).join("")}
+            </select>
+          </label>
+        </div>
         ${a.memo ? `<div class="student-app-memo">메모 · ${escapeHtml(a.memo)}</div>` : ""}
       </div>
     </article>
   `).join("");
+
+  $("#studentApplications").querySelectorAll(".teacher-status-select").forEach(select => {
+    select.addEventListener("change", async () => {
+      const oldStatus = getStudentApplications(studentKey).find(x => x.id === select.dataset.id)?.status || "검토중";
+      const newStatus = select.value;
+      if (oldStatus === newStatus) return;
+      await changeApplicationStatus(select.dataset.id, select.dataset.studentKey, oldStatus, newStatus, select);
+      // 실시간 반영 후 모달 진행률도 최신 상태로 갱신
+      setTimeout(() => {
+        if (currentStudentModalKey === studentKey) openStudentModal(studentKey);
+      }, 150);
+    });
+  });
 
   $("#studentModal").classList.remove("hidden");
   $("#studentModal").setAttribute("aria-hidden", "false");
@@ -393,6 +430,53 @@ $("#studentModal").addEventListener("click", (e) => {
   if (e.target === $("#studentModal")) closeStudentModal();
 });
 
+async function changeApplicationStatus(applicationId, studentKey, oldStatus, newStatus, selectEl = null) {
+  if (!applicationId || !studentKey) return false;
+
+  if (selectEl) {
+    selectEl.disabled = true;
+  }
+
+  try {
+    const application = rows.find(r => r.id === applicationId);
+    if (!application) throw new Error("지원정보를 찾을 수 없습니다.");
+
+    await updateDoc(doc(db, "applications", applicationId), {
+      status: newStatus,
+      updatedAt: serverTimestamp()
+    });
+
+    // 교사가 상태를 바꾼 사실도 수정 이력에 기록
+    await addDoc(collection(db, "applicationHistory"), {
+      studentKey,
+      classNo: application.classNo,
+      studentNo: application.studentNo,
+      studentName: application.studentName,
+      changes: [{
+        type: "수정",
+        priority: application.priority || 0,
+        text: `상태: ${oldStatus} → ${newStatus}`
+      }],
+      before: [],
+      after: [],
+      changedAt: serverTimestamp(),
+      changedByUid: auth.currentUser?.uid || "",
+      changedByTeacher: true
+    });
+
+    toast(`지원상태를 '${newStatus}'로 변경했습니다.`);
+    return true;
+  } catch (e) {
+    console.error(e);
+    toast("지원상태 변경에 실패했습니다. 권한이나 네트워크를 확인해 주세요.");
+    return false;
+  } finally {
+    if (selectEl) {
+      selectEl.disabled = false;
+    }
+  }
+}
+
 function renderTable() {
   const data = filteredRows();
   $("#visibleCount").textContent = `${data.length}건 표시`;
@@ -408,7 +492,13 @@ function renderTable() {
       <td>${escapeHtml(r.department)}</td>
       <td>${escapeHtml(r.admissionType)}</td>
       <td>${escapeHtml(r.admissionName)}</td>
-      <td><span class="status-pill ${statusClass(r.status)}">${escapeHtml(r.status || "검토중")}</span></td>
+      <td>
+        <select class="table-status-select" data-id="${escapeHtml(r.id)}" data-student-key="${escapeHtml(r.studentKey)}" data-old-status="${escapeHtml(r.status || "검토중")}">
+          ${["검토중","담임확인","최종결정","원서접수완료"].map(s =>
+            `<option value="${s}" ${(r.status || "검토중") === s ? "selected" : ""}>${s}</option>`
+          ).join("")}
+        </select>
+      </td>
     </tr>`).join("") : `<tr><td colspan="6"><div class="empty">조건에 맞는 지원정보가 없습니다.</div></td></tr>`;
 
 }

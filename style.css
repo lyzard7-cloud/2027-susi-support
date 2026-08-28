@@ -78,3 +78,19 @@
 .history-type.delete{background:#fff0f0;color:#b73737}
 @media(max-width:900px){.status-summary-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:560px){.status-summary-grid{grid-template-columns:repeat(2,1fr)}.modal-head{flex-direction:column}.modal-head-actions{width:100%}.modal-head-actions button{flex:1}.history-panel-head{align-items:flex-start;flex-direction:column}}
+
+.table-status-select{min-width:126px;padding:8px 9px;font-size:12px;font-weight:700}
+.student-progress{margin-top:10px}
+.progress-summary{background:#f7f9fc;border:1px solid var(--line);border-radius:12px;padding:11px 12px;min-width:240px}
+.progress-summary.complete{background:#f1faf4;border-color:#bfe2c8}
+.progress-summary-top{display:flex;justify-content:space-between;gap:15px;align-items:center;font-size:12px}
+.progress-summary-top span{font-weight:750}
+.progress-summary-top strong{font-size:15px}
+.progress-track{height:7px;background:#e5eaf2;border-radius:999px;overflow:hidden;margin:8px 0 5px}
+.progress-track span{display:block;height:100%;background:#2457d6;border-radius:999px}
+.progress-summary.complete .progress-track span{background:#2d8a50}
+.progress-summary small{font-size:10px;color:var(--muted)}
+.student-app-actions{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+.student-app-actions label{max-width:220px;font-size:11px}
+.teacher-status-select{padding:8px 9px;font-size:12px}
+@media(max-width:650px){.progress-summary{min-width:0}.table-status-select{min-width:118px}}
