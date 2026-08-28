@@ -264,18 +264,72 @@ function renderDuplicates() {
   });
   host.innerHTML = cards.length ? cards.join("") : `<div class="empty">현재 탐지된 중복지원 그룹이 없습니다.</div>`;
 }
+function getStudentApplications(studentKey) {
+  return rows
+    .filter(r => r.studentKey === studentKey)
+    .sort((a,b)=>(a.priority||99)-(b.priority||99));
+}
+
+function openStudentModal(studentKey) {
+  const apps = getStudentApplications(studentKey);
+  if (!apps.length) return toast("해당 학생의 지원정보가 없습니다.");
+
+  const first = apps[0];
+  $("#studentModalTitle").textContent = `${first.classNo}반 ${first.studentNo}번 ${first.studentName}`;
+  $("#studentModalSub").textContent = `등록된 지원정보 ${apps.length}건`;
+
+  $("#studentApplications").innerHTML = apps.map((a, index) => `
+    <article class="student-app-card">
+      <div class="student-app-number">${escapeHtml(a.priority || index + 1)}</div>
+      <div class="student-app-main">
+        <div class="student-app-university">${escapeHtml(a.university)}</div>
+        <div class="student-app-department">${escapeHtml(a.department)}</div>
+        <div class="student-app-meta">
+          <span>${escapeHtml(a.admissionType)}</span>
+          <span>${escapeHtml(a.admissionName)}</span>
+          <span class="status-pill ${statusClass(a.status)}">${escapeHtml(a.status || "검토중")}</span>
+        </div>
+        ${a.memo ? `<div class="student-app-memo">메모 · ${escapeHtml(a.memo)}</div>` : ""}
+      </div>
+    </article>
+  `).join("");
+
+  $("#studentModal").classList.remove("hidden");
+  $("#studentModal").setAttribute("aria-hidden", "false");
+}
+
+function closeStudentModal() {
+  $("#studentModal").classList.add("hidden");
+  $("#studentModal").setAttribute("aria-hidden", "true");
+  $("#studentApplications").innerHTML = "";
+}
+
+$("#studentModalCloseBtn").addEventListener("click", closeStudentModal);
+$("#studentModal").addEventListener("click", (e) => {
+  if (e.target === $("#studentModal")) closeStudentModal();
+});
+
 function renderTable() {
   const data = filteredRows();
   $("#visibleCount").textContent = `${data.length}건 표시`;
   $("#applicationTable").innerHTML = data.length ? data.map(r => `
     <tr>
-      <td class="student-cell">${escapeHtml(r.classNo)}반 ${escapeHtml(r.studentNo)}번<br>${escapeHtml(r.studentName)}</td>
+      <td class="student-cell">
+        <button type="button" class="student-name-button" data-student-key="${escapeHtml(r.studentKey)}">
+          <span>${escapeHtml(r.classNo)}반 ${escapeHtml(r.studentNo)}번</span>
+          <strong>${escapeHtml(r.studentName)}</strong>
+        </button>
+      </td>
       <td>${escapeHtml(r.university)}</td>
       <td>${escapeHtml(r.department)}</td>
       <td>${escapeHtml(r.admissionType)}</td>
       <td>${escapeHtml(r.admissionName)}</td>
       <td><span class="status-pill ${statusClass(r.status)}">${escapeHtml(r.status || "검토중")}</span></td>
     </tr>`).join("") : `<tr><td colspan="6"><div class="empty">조건에 맞는 지원정보가 없습니다.</div></td></tr>`;
+
+  $("#applicationTable").querySelectorAll(".student-name-button").forEach(btn => {
+    btn.addEventListener("click", () => openStudentModal(btn.dataset.studentKey));
+  });
 }
 function render() {
   renderStats();
@@ -389,8 +443,9 @@ $("#passwordModal").addEventListener("click", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !$("#passwordModal").classList.contains("hidden")) {
-    closePasswordModal();
+  if (e.key === "Escape") {
+    if (!$("#passwordModal").classList.contains("hidden")) closePasswordModal();
+    if (!$("#studentModal").classList.contains("hidden")) closeStudentModal();
   }
 });
 
@@ -488,6 +543,56 @@ onAuthStateChanged(auth, user => {
     $("#dashboard").classList.add("hidden");
     $("#loginPanel").classList.remove("hidden");
   }
+});
+
+function downloadCsv(filename, tableRows) {
+  const csv = "\ufeff" + tableRows.map(row =>
+    row.map(v => `"${String(v ?? "").replaceAll('"','""')}"`).join(",")
+  ).join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+$("#backupBtn").addEventListener("click", () => {
+  if (!rows.length && !roster.length) return toast("백업할 데이터가 없습니다.");
+
+  const date = new Date().toISOString().slice(0,10);
+
+  const applicationRows = [
+    ["반","번호","이름","지원순위","대학","학과","전형유형","전형명","상태","메모"],
+    ...[...rows]
+      .sort((a,b)=>Number(a.classNo)-Number(b.classNo) || Number(a.studentNo)-Number(b.studentNo) || (a.priority||99)-(b.priority||99))
+      .map(r => [
+        r.classNo, r.studentNo, r.studentName, r.priority,
+        r.university, r.department, r.admissionType, r.admissionName,
+        r.status, r.memo
+      ])
+  ];
+
+  // 일반 데이터 백업에는 PIN을 포함하지 않습니다.
+  const rosterRows = [
+    ["반","번호","이름","지원정보입력여부"],
+    ...[...roster]
+      .sort((a,b)=>Number(a.classNo)-Number(b.classNo) || Number(a.studentNo)-Number(b.studentNo))
+      .map(st => [
+        st.classNo, st.studentNo, st.studentName,
+        rows.some(r => r.studentKey === st.studentKey) ? "입력" : "미입력"
+      ])
+  ];
+
+  downloadCsv(`백업_지원현황_${date}.csv`, applicationRows);
+
+  // 브라우저가 연속 다운로드를 처리할 수 있도록 약간의 간격을 둡니다.
+  setTimeout(() => {
+    downloadCsv(`백업_학생명단_${date}.csv`, rosterRows);
+  }, 350);
+
+  toast("지원현황과 학생명단 백업을 내려받았습니다.");
 });
 
 $("#exportBtn").addEventListener("click", () => {

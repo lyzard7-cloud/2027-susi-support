@@ -43,7 +43,8 @@
           <p id="syncText">데이터를 불러오는 중입니다.</p>
         </div>
         <div class="heading-actions">
-          <button id="exportBtn" class="secondary">CSV 내려받기</button>
+          <button id="backupBtn" class="secondary">전체 데이터 백업</button>
+          <button id="exportBtn" class="ghost">지원현황 CSV</button>
           <button id="passwordBtn" class="ghost">내 비밀번호 변경</button>
           <button id="logoutBtn" class="ghost">로그아웃</button>
         </div>
@@ -172,6 +173,21 @@
       </section>
     </section>
   </main>
+
+
+  <div id="studentModal" class="modal-backdrop hidden" aria-hidden="true">
+    <div class="modal-card student-detail-modal" role="dialog" aria-modal="true" aria-labelledby="studentModalTitle">
+      <div class="modal-head">
+        <div>
+          <span class="eyebrow">학생별 지원현황</span>
+          <h2 id="studentModalTitle">학생 지원현황</h2>
+          <p id="studentModalSub" class="helper"></p>
+        </div>
+        <button id="studentModalCloseBtn" class="ghost small-btn" type="button">닫기</button>
+      </div>
+      <div id="studentApplications" class="student-app-list"></div>
+    </div>
+  </div>
 
   <div id="passwordModal" class="modal-backdrop hidden" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">

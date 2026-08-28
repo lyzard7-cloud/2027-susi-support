@@ -34,3 +34,18 @@
 .password-guide{font-size:12px;line-height:1.5;color:var(--muted);background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px}
 .small-btn{padding:8px 10px}
 @media(max-width:650px){.heading-actions{flex-wrap:wrap}.heading-actions button{min-width:calc(50% - 4px)}.modal-card{padding:20px}.modal-actions button{flex:1}}
+
+.student-name-button{appearance:none;border:0;background:transparent;padding:0;text-align:left;color:var(--text);display:flex;flex-direction:column;gap:2px;cursor:pointer;border-radius:7px}
+.student-name-button span{font-size:11px;color:var(--muted);font-weight:600}
+.student-name-button strong{font-size:13px;font-weight:800;text-decoration:underline;text-decoration-color:#bac7df;text-underline-offset:3px}
+.student-name-button:hover strong{color:var(--primary);text-decoration-color:var(--primary)}
+.student-detail-modal{width:min(720px,100%);max-height:min(82vh,820px);overflow:auto}
+.student-app-list{display:flex;flex-direction:column;gap:10px}
+.student-app-card{display:grid;grid-template-columns:42px 1fr;gap:12px;border:1px solid var(--line);border-radius:14px;padding:15px;background:#fbfcfe}
+.student-app-number{width:34px;height:34px;border-radius:10px;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;font-size:13px;font-weight:850}
+.student-app-university{font-size:16px;font-weight:850;letter-spacing:-.02em}
+.student-app-department{font-size:14px;margin-top:3px}
+.student-app-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:9px}
+.student-app-meta>span:not(.status-pill){font-size:11px;background:#f0f3f8;border-radius:999px;padding:5px 7px;color:#526077}
+.student-app-memo{font-size:12px;color:var(--muted);margin-top:9px;border-top:1px dashed var(--line);padding-top:8px}
+@media(max-width:650px){.student-detail-modal{max-height:88vh}.student-app-card{grid-template-columns:36px 1fr;padding:13px}.student-app-number{width:30px;height:30px}}
