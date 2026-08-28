@@ -6,10 +6,29 @@ import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { firebaseConfig } from "./firebase-config.js";
+import { PIN_ADMIN_EMAIL } from "./admin-config.js";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+
+function isPinAdmin(user = auth.currentUser) {
+  return !!user && String(user.email || "").toLowerCase() === String(PIN_ADMIN_EMAIL || "").toLowerCase();
+}
+
+function updatePinAdminUI(user = auth.currentUser) {
+  const allowed = isPinAdmin(user);
+  const genBtn = document.querySelector("#generatePinsBtn");
+  const exportBtn = document.querySelector("#exportPinsBtn");
+  const note = document.querySelector("#pinAdminOnlyNote");
+
+  if (genBtn) genBtn.classList.toggle("hidden", !allowed);
+  if (exportBtn) exportBtn.classList.toggle("hidden", !allowed);
+  if (note) {
+    note.classList.toggle("hidden", allowed);
+    if (!allowed) note.textContent = "PIN 생성·재발급 및 PIN 목록 다운로드는 최고관리자만 사용할 수 있습니다.";
+  }
+}
 const $ = (s) => document.querySelector(s);
 const toastEl = $("#toast");
 let rows = [];
@@ -267,6 +286,7 @@ function render() {
 $("#searchInput").addEventListener("input", renderTable);
 
 $("#generatePinsBtn").addEventListener("click", async () => {
+  if (!isPinAdmin()) return toast("PIN 생성 권한이 없습니다.");
   if (!roster.length) return toast("먼저 학생 명단을 업로드해 주세요.");
   if (!confirm(`현재 등록된 ${roster.length}명 전체의 PIN을 새로 발급합니다.\n\n기존 PIN은 사용할 수 없게 됩니다. 계속하시겠습니까?`)) return;
   try {
@@ -338,6 +358,7 @@ $("#loginBtn").addEventListener("click", async () => {
 $("#logoutBtn").addEventListener("click", () => signOut(auth));
 
 onAuthStateChanged(auth, user => {
+  updatePinAdminUI(user);
   if (user) {
     $("#loginPanel").classList.add("hidden");
     $("#dashboard").classList.remove("hidden");

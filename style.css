@@ -22,3 +22,5 @@
 @media(max-width:650px){.roster-actions{width:100%}.file-input{max-width:none}.roster-actions>*{width:100%}}
 
 .pin-grid{grid-template-columns:1fr 1fr 1.6fr 1.4fr}.pin-admin-note{margin-top:10px;font-size:12px;line-height:1.5;color:#8a5a00;background:#fff8e8;border:1px solid #f0d49f;border-radius:10px;padding:9px 11px}@media(max-width:800px){.pin-grid{grid-template-columns:1fr 1fr}}@media(max-width:520px){.pin-grid{grid-template-columns:1fr}}
+
+.pin-admin-only{margin-top:10px;font-size:12px;line-height:1.5;color:#576071;background:#f5f7fb;border:1px solid var(--line);border-radius:10px;padding:9px 11px}
