@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import {
-  getFirestore, collection, onSnapshot, writeBatch, doc, getDocs, serverTimestamp, query, where,
-  query, where, updateDoc, addDoc, setDoc, getDoc, deleteDoc, deleteDoc
+  getFirestore, collection, onSnapshot, writeBatch, doc, getDocs,
+  serverTimestamp, query, where, updateDoc, addDoc, setDoc, getDoc, deleteDoc
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
