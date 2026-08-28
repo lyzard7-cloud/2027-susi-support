@@ -44,6 +44,7 @@
         </div>
         <div class="heading-actions">
           <button id="exportBtn" class="secondary">CSV 내려받기</button>
+          <button id="passwordBtn" class="ghost">내 비밀번호 변경</button>
           <button id="logoutBtn" class="ghost">로그아웃</button>
         </div>
       </div>
@@ -171,6 +172,41 @@
       </section>
     </section>
   </main>
+
+  <div id="passwordModal" class="modal-backdrop hidden" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
+      <div class="modal-head">
+        <div>
+          <h2 id="passwordModalTitle">내 비밀번호 변경</h2>
+          <p id="passwordAccountText" class="helper"></p>
+        </div>
+        <button id="passwordCloseBtn" class="ghost small-btn" type="button">닫기</button>
+      </div>
+
+      <label>현재 비밀번호
+        <input id="currentPassword" type="password" autocomplete="current-password" placeholder="현재 비밀번호" />
+      </label>
+
+      <label>새 비밀번호
+        <input id="newPassword" type="password" autocomplete="new-password" placeholder="8자 이상 권장" />
+      </label>
+
+      <label>새 비밀번호 확인
+        <input id="confirmPassword" type="password" autocomplete="new-password" placeholder="새 비밀번호 다시 입력" />
+      </label>
+
+      <div class="password-guide">
+        다른 교사와 비밀번호를 공유하지 말고, 기존 비밀번호와 다른 비밀번호를 사용하세요.
+      </div>
+
+      <div id="passwordError" class="error-text"></div>
+
+      <div class="modal-actions">
+        <button id="passwordCancelBtn" class="ghost" type="button">취소</button>
+        <button id="passwordSaveBtn" class="primary" type="button">비밀번호 변경</button>
+      </div>
+    </div>
+  </div>
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>

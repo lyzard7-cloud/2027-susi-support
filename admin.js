@@ -3,7 +3,8 @@ import {
   getFirestore, collection, onSnapshot, writeBatch, doc, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
+  EmailAuthProvider, reauthenticateWithCredential, updatePassword
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { firebaseConfig } from "./firebase-config.js";
 import { PIN_ADMIN_EMAIL } from "./admin-config.js";
@@ -355,6 +356,100 @@ $("#loginBtn").addEventListener("click", async () => {
     $("#loginError").textContent = "로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.";
   }
 });
+
+function openPasswordModal() {
+  const user = auth.currentUser;
+  if (!user) return toast("먼저 로그인해 주세요.");
+
+  $("#passwordAccountText").textContent = `로그인 계정: ${user.email || ""}`;
+  $("#currentPassword").value = "";
+  $("#newPassword").value = "";
+  $("#confirmPassword").value = "";
+  $("#passwordError").textContent = "";
+  $("#passwordModal").classList.remove("hidden");
+  $("#passwordModal").setAttribute("aria-hidden", "false");
+  setTimeout(() => $("#currentPassword").focus(), 50);
+}
+
+function closePasswordModal() {
+  $("#passwordModal").classList.add("hidden");
+  $("#passwordModal").setAttribute("aria-hidden", "true");
+  $("#currentPassword").value = "";
+  $("#newPassword").value = "";
+  $("#confirmPassword").value = "";
+  $("#passwordError").textContent = "";
+}
+
+$("#passwordBtn").addEventListener("click", openPasswordModal);
+$("#passwordCloseBtn").addEventListener("click", closePasswordModal);
+$("#passwordCancelBtn").addEventListener("click", closePasswordModal);
+
+$("#passwordModal").addEventListener("click", (e) => {
+  if (e.target === $("#passwordModal")) closePasswordModal();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("#passwordModal").classList.contains("hidden")) {
+    closePasswordModal();
+  }
+});
+
+$("#passwordSaveBtn").addEventListener("click", async () => {
+  const user = auth.currentUser;
+  if (!user || !user.email) return toast("로그인 정보를 확인할 수 없습니다.");
+
+  const currentPassword = $("#currentPassword").value;
+  const newPassword = $("#newPassword").value;
+  const confirmPassword = $("#confirmPassword").value;
+  const errorEl = $("#passwordError");
+  errorEl.textContent = "";
+
+  if (!currentPassword) {
+    errorEl.textContent = "현재 비밀번호를 입력해 주세요.";
+    return;
+  }
+  if (newPassword.length < 8) {
+    errorEl.textContent = "새 비밀번호는 8자 이상으로 설정해 주세요.";
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    errorEl.textContent = "새 비밀번호와 확인 비밀번호가 일치하지 않습니다.";
+    return;
+  }
+  if (currentPassword === newPassword) {
+    errorEl.textContent = "현재 비밀번호와 다른 비밀번호를 사용해 주세요.";
+    return;
+  }
+
+  const btn = $("#passwordSaveBtn");
+  btn.disabled = true;
+  btn.textContent = "변경 중...";
+
+  try {
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+    await updatePassword(user, newPassword);
+
+    closePasswordModal();
+    toast("비밀번호가 변경되었습니다. 다음 로그인부터 새 비밀번호를 사용하세요.");
+  } catch (e) {
+    console.error(e);
+    const code = e?.code || "";
+    if (code.includes("invalid-credential") || code.includes("wrong-password")) {
+      errorEl.textContent = "현재 비밀번호가 맞지 않습니다.";
+    } else if (code.includes("weak-password")) {
+      errorEl.textContent = "새 비밀번호가 너무 단순합니다. 더 안전한 비밀번호를 사용해 주세요.";
+    } else if (code.includes("too-many-requests")) {
+      errorEl.textContent = "시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.";
+    } else {
+      errorEl.textContent = "비밀번호 변경에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "비밀번호 변경";
+  }
+});
+
 $("#logoutBtn").addEventListener("click", () => signOut(auth));
 
 onAuthStateChanged(auth, user => {

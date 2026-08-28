@@ -24,3 +24,13 @@
 .pin-grid{grid-template-columns:1fr 1fr 1.6fr 1.4fr}.pin-admin-note{margin-top:10px;font-size:12px;line-height:1.5;color:#8a5a00;background:#fff8e8;border:1px solid #f0d49f;border-radius:10px;padding:9px 11px}@media(max-width:800px){.pin-grid{grid-template-columns:1fr 1fr}}@media(max-width:520px){.pin-grid{grid-template-columns:1fr}}
 
 .pin-admin-only{margin-top:10px;font-size:12px;line-height:1.5;color:#576071;background:#f5f7fb;border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+
+.modal-backdrop{position:fixed;inset:0;background:rgba(17,24,39,.48);display:grid;place-items:center;padding:20px;z-index:200}
+.modal-card{width:min(460px,100%);background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.18);padding:24px}
+.modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:18px}
+.modal-head h2{margin:0 0 5px;font-size:20px}
+.modal-card label{margin:13px 0}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.password-guide{font-size:12px;line-height:1.5;color:var(--muted);background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px}
+.small-btn{padding:8px 10px}
+@media(max-width:650px){.heading-actions{flex-wrap:wrap}.heading-actions button{min-width:calc(50% - 4px)}.modal-card{padding:20px}.modal-actions button{flex:1}}
