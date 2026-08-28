@@ -327,9 +327,6 @@ function renderTable() {
       <td><span class="status-pill ${statusClass(r.status)}">${escapeHtml(r.status || "검토중")}</span></td>
     </tr>`).join("") : `<tr><td colspan="6"><div class="empty">조건에 맞는 지원정보가 없습니다.</div></td></tr>`;
 
-  $("#applicationTable").querySelectorAll(".student-name-button").forEach(btn => {
-    btn.addEventListener("click", () => openStudentModal(btn.dataset.studentKey));
-  });
 }
 function render() {
   renderStats();
@@ -339,6 +336,15 @@ function render() {
 }
 ["filterClass","filterType","viewMode"].forEach(id => $("#"+id).addEventListener("change", renderTable));
 $("#searchInput").addEventListener("input", renderTable);
+
+// 학생 이름 클릭은 표가 다시 그려져도 항상 작동하도록 이벤트 위임 방식 사용
+$("#applicationTable").addEventListener("click", (event) => {
+  const btn = event.target.closest(".student-name-button");
+  if (!btn) return;
+  const studentKey = btn.dataset.studentKey;
+  if (!studentKey) return;
+  openStudentModal(studentKey);
+});
 
 $("#generatePinsBtn").addEventListener("click", async () => {
   if (!isPinAdmin()) return toast("PIN 생성 권한이 없습니다.");

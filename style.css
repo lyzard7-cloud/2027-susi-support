@@ -49,3 +49,7 @@
 .student-app-meta>span:not(.status-pill){font-size:11px;background:#f0f3f8;border-radius:999px;padding:5px 7px;color:#526077}
 .student-app-memo{font-size:12px;color:var(--muted);margin-top:9px;border-top:1px dashed var(--line);padding-top:8px}
 @media(max-width:650px){.student-detail-modal{max-height:88vh}.student-app-card{grid-template-columns:36px 1fr;padding:13px}.student-app-number{width:30px;height:30px}}
+
+.student-name-button{min-width:92px}
+.student-name-button::after{content:"지원현황 보기";display:inline-block;margin-top:4px;font-size:10px;font-weight:700;color:var(--primary);opacity:.78}
+.student-name-button:hover::after{opacity:1}
