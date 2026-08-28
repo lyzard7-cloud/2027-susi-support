@@ -48,6 +48,24 @@
         </div>
       </div>
 
+      <section class="card roster-card">
+        <div class="section-head">
+          <div>
+            <h2>3학년 학생 명단</h2>
+            <p>엑셀(.xlsx, .xls) 또는 CSV 파일을 업로드하면 반·번호·이름을 읽어 전체 학생 명단으로 저장합니다.</p>
+          </div>
+          <div class="roster-actions">
+            <input id="rosterFile" type="file" accept=".xlsx,.xls,.csv" class="file-input" />
+            <button id="uploadRosterBtn" class="secondary">학생 명단 업로드</button>
+          </div>
+        </div>
+        <div class="roster-help">
+          파일의 첫 행에 <span>반</span>, <span>번호</span>, <span>이름</span> 열이 있으면 됩니다.
+          예: 3 | 17 | 홍길동
+        </div>
+        <div id="rosterUploadStatus" class="helper"></div>
+      </section>
+
       <section class="stats-grid">
         <div class="stat-card">
           <span>입력 학생</span><strong id="studentCount">0</strong><small>명</small>
@@ -67,10 +85,21 @@
         <div class="section-head">
           <div>
             <h2>반별 입력 현황</h2>
-            <p>각 반에서 현재까지 지원정보를 한 번 이상 등록한 학생 수입니다.</p>
+            <p>업로드한 전체 학생 명단과 실제 지원정보 입력 학생을 비교합니다. 반을 누르면 미입력 학생을 확인할 수 있습니다.</p>
           </div>
         </div>
         <div id="classStatusGrid" class="class-status-grid"></div>
+      </section>
+
+      <section id="missingSection" class="card hidden">
+        <div class="section-head">
+          <div>
+            <h2 id="missingTitle">미입력 학생</h2>
+            <p>아직 지원정보를 한 건도 입력하지 않은 학생입니다.</p>
+          </div>
+          <button id="closeMissingBtn" class="ghost">닫기</button>
+        </div>
+        <div id="missingList" class="missing-list"></div>
       </section>
 
       <section class="card filters">
@@ -140,6 +169,7 @@
   </main>
 
   <div id="toast" class="toast" role="status"></div>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script type="module" src="./admin.js"></script>
 </body>
 </html>

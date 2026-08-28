@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import {
-  getFirestore, collection, onSnapshot
+  getFirestore, collection, onSnapshot, writeBatch, doc, getDocs
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -13,7 +13,9 @@ const auth = getAuth(app);
 const $ = (s) => document.querySelector(s);
 const toastEl = $("#toast");
 let rows = [];
+let roster = [];
 let unsubscribe = null;
+let unsubscribeRoster = null;
 
 function toast(message) {
   toastEl.textContent = message;
@@ -57,6 +59,53 @@ function refreshComparisonKeys(row) {
     ].join("|")
   };
 }
+function makeStudentKey(classNo, studentNo, studentName) {
+  const c = String(classNo ?? "").trim();
+  const n = String(studentNo ?? "").trim().padStart(2, "0");
+  const name = String(studentName ?? "").trim();
+  return `${c}-${n}-${normalize(name)}`;
+}
+function findHeaderKey(obj, candidates) {
+  const keys = Object.keys(obj || {});
+  return keys.find(k => candidates.includes(normalize(k))) || null;
+}
+function parseRosterRows(rawRows) {
+  const cleaned = [];
+  for (const row of rawRows) {
+    const classKey = findHeaderKey(row, ["반","학급","class","classno"]);
+    const noKey = findHeaderKey(row, ["번호","번","학번","number","studentno"]);
+    const nameKey = findHeaderKey(row, ["이름","성명","학생명","name","studentname"]);
+    if (!classKey || !noKey || !nameKey) continue;
+
+    const classNoRaw = String(row[classKey] ?? "").trim();
+    const studentNoRaw = String(row[noKey] ?? "").trim();
+    const studentName = String(row[nameKey] ?? "").trim();
+
+    const classMatch = classNoRaw.match(/[1-9]/);
+    const noMatch = studentNoRaw.match(/\d+/);
+    if (!classMatch || !noMatch || !studentName) continue;
+
+    const classNo = classMatch[0];
+    const studentNo = String(Number(noMatch[0]));
+    if (!["1","2","3","4","5","6","7","8","9"].includes(classNo)) continue;
+
+    cleaned.push({
+      classNo,
+      studentNo,
+      studentName,
+      studentKey: makeStudentKey(classNo, studentNo, studentName)
+    });
+  }
+
+  const unique = new Map();
+  cleaned.forEach(r => unique.set(r.studentKey, r));
+  return [...unique.values()].sort((a,b) =>
+    Number(a.classNo)-Number(b.classNo) ||
+    Number(a.studentNo)-Number(b.studentNo) ||
+    a.studentName.localeCompare(b.studentName, "ko")
+  );
+}
+
 function groupBy(key) {
   const m = new Map();
   rows.forEach(r => {
@@ -103,28 +152,57 @@ function renderStats() {
   $("#exactCount").textContent = groupBy("exactKey").length;
   $("#deptCount").textContent = groupBy("departmentKey").length;
 }
+function getEnteredStudentKeys() {
+  return new Set(rows.map(r => r.studentKey));
+}
+function getMissingForClass(classNo = "") {
+  const entered = getEnteredStudentKeys();
+  return roster.filter(r => (!classNo || r.classNo === classNo) && !entered.has(r.studentKey));
+}
+function showMissing(classNo = "") {
+  const list = getMissingForClass(classNo);
+  $("#missingTitle").textContent = classNo ? `${classNo}반 미입력 학생` : "전체 미입력 학생";
+  $("#missingSection").classList.remove("hidden");
+  $("#missingList").innerHTML = list.length
+    ? list.map(r => `<span class="missing-chip">${escapeHtml(r.classNo)}반 ${escapeHtml(r.studentNo)}번 ${escapeHtml(r.studentName)}</span>`).join("")
+    : `<div class="empty">미입력 학생이 없습니다.</div>`;
+  $("#missingSection").scrollIntoView({behavior:"smooth", block:"center"});
+}
 function renderClassStatus() {
   const host = $("#classStatusGrid");
-  const counts = {};
-  for (let i = 1; i <= 9; i++) counts[String(i)] = new Set();
+  const entered = getEnteredStudentKeys();
 
-  rows.forEach(r => {
-    if (counts[r.classNo]) counts[r.classNo].add(r.studentKey);
-  });
+  host.innerHTML = Array.from({length:9}, (_,i)=>String(i+1)).map(classNo => {
+    const all = roster.filter(r => r.classNo === classNo);
+    const enteredCount = all.filter(r => entered.has(r.studentKey)).length;
+    const missingCount = Math.max(0, all.length - enteredCount);
 
-  host.innerHTML = Object.entries(counts).map(([classNo, set]) => `
-    <button type="button" class="class-status-item" data-class="${classNo}">
+    if (!all.length) {
+      const fallbackEntered = new Set(rows.filter(r=>r.classNo===classNo).map(r=>r.studentKey)).size;
+      return `<button type="button" class="class-status-item" data-class="${classNo}">
+        <span class="class-label">${classNo}반</span>
+        <strong>${fallbackEntered}</strong>
+        <small>명 입력 · 명단 미등록</small>
+      </button>`;
+    }
+
+    return `<button type="button" class="class-status-item ${missingCount ? "has-missing" : "complete"}" data-class="${classNo}">
       <span class="class-label">${classNo}반</span>
-      <strong>${set.size}</strong>
-      <small>명 입력</small>
-    </button>
-  `).join("");
+      <strong>${enteredCount}/${all.length}</strong>
+      <small>${missingCount ? `미입력 ${missingCount}명` : "입력 완료"}</small>
+    </button>`;
+  }).join("");
 
   host.querySelectorAll(".class-status-item").forEach(btn => {
     btn.addEventListener("click", () => {
-      $("#filterClass").value = btn.dataset.class;
-      renderTable();
-      document.querySelector(".filters").scrollIntoView({behavior:"smooth", block:"center"});
+      const classNo = btn.dataset.class;
+      if (roster.some(r=>r.classNo===classNo)) {
+        showMissing(classNo);
+      } else {
+        $("#filterClass").value = classNo;
+        renderTable();
+        document.querySelector(".filters").scrollIntoView({behavior:"smooth", block:"center"});
+      }
     });
   });
 }
@@ -185,6 +263,51 @@ function render() {
 ["filterClass","filterType","viewMode"].forEach(id => $("#"+id).addEventListener("change", renderTable));
 $("#searchInput").addEventListener("input", renderTable);
 
+$("#uploadRosterBtn").addEventListener("click", async () => {
+  const input = $("#rosterFile");
+  const file = input.files?.[0];
+  if (!file) return toast("먼저 학생 명단 파일을 선택해 주세요.");
+
+  try {
+    $("#uploadRosterBtn").disabled = true;
+    $("#rosterUploadStatus").textContent = "파일을 읽는 중입니다...";
+
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, {type:"array"});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const raw = XLSX.utils.sheet_to_json(ws, {defval:""});
+    const parsed = parseRosterRows(raw);
+
+    if (!parsed.length) {
+      throw new Error("반·번호·이름 열을 찾지 못했거나 읽을 수 있는 학생이 없습니다.");
+    }
+
+    const existing = await getDocs(collection(db, "students"));
+    const batch = writeBatch(db);
+
+    // 업로드 파일을 현재 전체 명단으로 간주하여 기존 roster를 교체
+    existing.forEach(d => batch.delete(d.ref));
+    parsed.forEach(st => {
+      const ref = doc(collection(db, "students"));
+      batch.set(ref, st);
+    });
+    await batch.commit();
+
+    $("#rosterUploadStatus").textContent = `${parsed.length}명의 학생 명단을 저장했습니다.`;
+    toast(`${parsed.length}명의 학생 명단을 업로드했습니다.`);
+  } catch (e) {
+    console.error(e);
+    $("#rosterUploadStatus").textContent = "";
+    toast(e.message || "학생 명단 업로드 중 오류가 발생했습니다.");
+  } finally {
+    $("#uploadRosterBtn").disabled = false;
+  }
+});
+
+$("#closeMissingBtn").addEventListener("click", () => {
+  $("#missingSection").classList.add("hidden");
+});
+
 $("#loginBtn").addEventListener("click", async () => {
   $("#loginError").textContent = "";
   try {
@@ -200,6 +323,20 @@ onAuthStateChanged(auth, user => {
     $("#loginPanel").classList.add("hidden");
     $("#dashboard").classList.remove("hidden");
     if (unsubscribe) unsubscribe();
+    if (unsubscribeRoster) unsubscribeRoster();
+
+    unsubscribeRoster = onSnapshot(collection(db, "students"), snap => {
+      roster = snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>
+        Number(a.classNo)-Number(b.classNo) ||
+        Number(a.studentNo)-Number(b.studentNo) ||
+        String(a.studentName).localeCompare(String(b.studentName), "ko")
+      );
+      renderClassStatus();
+    }, err => {
+      console.error(err);
+      $("#rosterUploadStatus").textContent = "학생 명단 조회 권한을 확인해 주세요.";
+    });
+
     unsubscribe = onSnapshot(collection(db, "applications"), snap => {
       rows = snap.docs.map(d=>refreshComparisonKeys({id:d.id,...d.data()}));
       $("#syncText").textContent = `실시간 동기화 중 · ${new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})} 기준`;
@@ -210,7 +347,9 @@ onAuthStateChanged(auth, user => {
     });
   } else {
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+    if (unsubscribeRoster) { unsubscribeRoster(); unsubscribeRoster = null; }
     rows = [];
+    roster = [];
     $("#dashboard").classList.add("hidden");
     $("#loginPanel").classList.remove("hidden");
   }
