@@ -197,6 +197,79 @@ $("#loadBtn").addEventListener("click", async () => {
   }
 });
 
+
+function comparableApp(a = {}) {
+  return {
+    priority: Number(a.priority || 0),
+    university: String(a.university || "").trim(),
+    department: String(a.department || "").trim(),
+    admissionType: String(a.admissionType || "").trim(),
+    admissionName: String(a.admissionName || "").trim(),
+    status: String(a.status || "검토중").trim(),
+    memo: String(a.memo || "").trim()
+  };
+}
+
+function appsAreSame(oldApps, newApps) {
+  const a = [...oldApps].map(comparableApp).sort((x,y)=>x.priority-y.priority);
+  const b = [...newApps].map(comparableApp).sort((x,y)=>x.priority-y.priority);
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function makeChangeSummary(oldApps, newApps) {
+  const oldByPriority = new Map(oldApps.map(a => [Number(a.priority || 0), comparableApp(a)]));
+  const newByPriority = new Map(newApps.map(a => [Number(a.priority || 0), comparableApp(a)]));
+  const priorities = [...new Set([...oldByPriority.keys(), ...newByPriority.keys()])].sort((a,b)=>a-b);
+  const changes = [];
+
+  for (const priority of priorities) {
+    const oldA = oldByPriority.get(priority);
+    const newA = newByPriority.get(priority);
+
+    if (!oldA && newA) {
+      changes.push({
+        type: "추가",
+        priority,
+        text: `${newA.university} · ${newA.department} · ${newA.admissionName}`
+      });
+      continue;
+    }
+    if (oldA && !newA) {
+      changes.push({
+        type: "삭제",
+        priority,
+        text: `${oldA.university} · ${oldA.department} · ${oldA.admissionName}`
+      });
+      continue;
+    }
+
+    const fields = [
+      ["대학", "university"],
+      ["학과", "department"],
+      ["전형유형", "admissionType"],
+      ["전형명", "admissionName"],
+      ["상태", "status"],
+      ["메모", "memo"]
+    ];
+
+    const details = [];
+    for (const [label, key] of fields) {
+      if (oldA[key] !== newA[key]) {
+        details.push(`${label}: ${oldA[key] || "없음"} → ${newA[key] || "없음"}`);
+      }
+    }
+
+    if (details.length) {
+      changes.push({
+        type: "수정",
+        priority,
+        text: details.join(" / ")
+      });
+    }
+  }
+  return changes;
+}
+
 $("#submitBtn").addEventListener("click", async () => {
   try {
     const id = getIdentity();
@@ -208,8 +281,28 @@ $("#submitBtn").addEventListener("click", async () => {
 
     const oldQ = query(collection(db, "applications"), where("studentKey", "==", id.studentKey));
     const oldSnap = await getDocs(oldQ);
+    const oldApps = oldSnap.docs
+      .map(d => ({id:d.id, ...d.data()}))
+      .sort((a,b)=>(a.priority||99)-(b.priority||99));
+
     const batch = writeBatch(db);
     oldSnap.forEach(d => batch.delete(d.ref));
+
+    // 기존 내용과 실제로 달라진 경우에만 수정 이력 저장
+    if (oldApps.length && !appsAreSame(oldApps, apps)) {
+      const historyRef = doc(collection(db, "applicationHistory"));
+      batch.set(historyRef, {
+        studentKey: id.studentKey,
+        classNo: id.classNo,
+        studentNo: id.studentNo,
+        studentName: id.studentName,
+        changes: makeChangeSummary(oldApps, apps),
+        before: oldApps.map(comparableApp),
+        after: apps.map(comparableApp),
+        changedAt: serverTimestamp(),
+        changedByUid: currentUser.uid
+      });
+    }
 
     apps.forEach((a, i) => {
       const ref = doc(collection(db, "applications"));

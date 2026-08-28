@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>교사용 | 2027 수시지원 관리</title>
-  <link rel="stylesheet" href="./style.css?v=7.1" />
+  <link rel="stylesheet" href="./style.css?v=8.0" />
 </head>
 <body>
   <header class="topbar">
@@ -87,6 +87,26 @@
         </div>
       </section>
 
+      <section class="status-summary-grid">
+        <button class="status-summary-card" data-status="">
+          <span>전체</span><strong id="statusAllCount">0</strong><small>건</small>
+        </button>
+        <button class="status-summary-card" data-status="검토중">
+          <span>검토중</span><strong id="statusReviewCount">0</strong><small>건</small>
+        </button>
+        <button class="status-summary-card" data-status="담임확인">
+          <span>담임확인</span><strong id="statusTeacherCount">0</strong><small>건</small>
+        </button>
+        <button class="status-summary-card" data-status="최종결정">
+          <span>최종결정</span><strong id="statusFinalCount">0</strong><small>건</small>
+        </button>
+        <button class="status-summary-card submitted" data-status="원서접수완료">
+          <span>원서접수완료</span><strong id="statusSubmittedCount">0</strong><small>건</small>
+        </button>
+      </section>
+
+
+
       <section class="card class-status-card">
         <div class="section-head">
           <div>
@@ -126,6 +146,15 @@
               <option value="exact">🔴 완전 중복만</option>
               <option value="department">🟠 동일 대학·학과</option>
               <option value="university">🟡 동일 대학</option>
+            </select>
+          </label>
+          <label>지원상태
+            <select id="filterStatus">
+              <option value="">전체 상태</option>
+              <option>검토중</option>
+              <option>담임확인</option>
+              <option>최종결정</option>
+              <option>원서접수완료</option>
             </select>
           </label>
           <label>전형유형
@@ -183,9 +212,19 @@
           <h2 id="studentModalTitle">학생 지원현황</h2>
           <p id="studentModalSub" class="helper"></p>
         </div>
-        <button id="studentModalCloseBtn" class="ghost small-btn" type="button">닫기</button>
+        <div class="modal-head-actions">
+          <button id="historyBtn" class="secondary small-btn" type="button">수정 이력</button>
+          <button id="studentModalCloseBtn" class="ghost small-btn" type="button">닫기</button>
+        </div>
       </div>
       <div id="studentApplications" class="student-app-list"></div>
+      <div id="historyPanel" class="history-panel hidden">
+        <div class="history-panel-head">
+          <h3>지원정보 수정 이력</h3>
+          <span class="helper">학생이 지원안을 저장할 때 변경된 내용이 기록됩니다.</span>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </div>
     </div>
   </div>
 
@@ -226,6 +265,6 @@
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./admin.js?v=7.1"></script>
+  <script type="module" src="./admin.js?v=8.0"></script>
 </body>
 </html>

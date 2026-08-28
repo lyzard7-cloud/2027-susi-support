@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import {
-  getFirestore, collection, onSnapshot, writeBatch, doc, getDocs, serverTimestamp
+  getFirestore, collection, onSnapshot, writeBatch, doc, getDocs, serverTimestamp,
+  query, where
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
@@ -36,6 +37,7 @@ let rows = [];
 let roster = [];
 let unsubscribe = null;
 let unsubscribeRoster = null;
+let currentStudentModalKey = null;
 
 function toast(message) {
   toastEl.textContent = message;
@@ -147,6 +149,7 @@ function duplicatesSet(key) {
 function filteredRows() {
   const c = $("#filterClass").value;
   const type = $("#filterType").value;
+  const status = $("#filterStatus").value;
   const q = $("#searchInput").value.trim().toLowerCase();
   const mode = $("#viewMode").value;
   const exact = duplicatesSet("exactKey");
@@ -156,7 +159,8 @@ function filteredRows() {
   return rows.filter(r => {
     if (c && r.classNo !== c) return false;
     if (type && r.admissionType !== type) return false;
-    if (q && ![r.studentName,r.university,r.department,r.admissionType,r.admissionName].join(" ").toLowerCase().includes(q)) return false;
+    if (status && (r.status || "검토중") !== status) return false;
+    if (q && ![r.studentName,r.university,r.department,r.admissionType,r.admissionName,r.status].join(" ").toLowerCase().includes(q)) return false;
     if (mode === "exact" && !exact.has(r.id)) return false;
     if (mode === "department" && !dept.has(r.id)) return false;
     if (mode === "university" && !uni.has(r.id)) return false;
@@ -174,6 +178,18 @@ function renderStats() {
   $("#applicationCount").textContent = rows.length;
   $("#exactCount").textContent = groupBy("exactKey").length;
   $("#deptCount").textContent = groupBy("departmentKey").length;
+}
+function renderStatusSummary() {
+  const count = (status) => rows.filter(r => (r.status || "검토중") === status).length;
+  $("#statusAllCount").textContent = rows.length;
+  $("#statusReviewCount").textContent = count("검토중");
+  $("#statusTeacherCount").textContent = count("담임확인");
+  $("#statusFinalCount").textContent = count("최종결정");
+  $("#statusSubmittedCount").textContent = count("원서접수완료");
+
+  document.querySelectorAll(".status-summary-card").forEach(btn => {
+    btn.classList.toggle("active", $("#filterStatus").value === btn.dataset.status);
+  });
 }
 function getEnteredStudentKeys() {
   return new Set(rows.map(r => r.studentKey));
@@ -271,6 +287,9 @@ function getStudentApplications(studentKey) {
 }
 
 function openStudentModal(studentKey) {
+  currentStudentModalKey = studentKey;
+  $("#historyPanel").classList.add("hidden");
+  $("#historyList").innerHTML = "";
   const apps = getStudentApplications(studentKey);
   if (!apps.length) return toast("해당 학생의 지원정보가 없습니다.");
 
@@ -299,10 +318,75 @@ function openStudentModal(studentKey) {
 }
 
 function closeStudentModal() {
+  currentStudentModalKey = null;
+  $("#historyPanel").classList.add("hidden");
+  $("#historyList").innerHTML = "";
   $("#studentModal").classList.add("hidden");
   $("#studentModal").setAttribute("aria-hidden", "true");
   $("#studentApplications").innerHTML = "";
 }
+
+async function loadStudentHistory(studentKey) {
+  if (!studentKey) return;
+  const host = $("#historyList");
+  host.innerHTML = `<div class="empty">수정 이력을 불러오는 중입니다.</div>`;
+
+  try {
+    const q = query(
+      collection(db, "applicationHistory"),
+      where("studentKey", "==", studentKey)
+    );
+    const snap = await getDocs(q);
+    const list = snap.docs.map(d => ({id:d.id, ...d.data()}))
+      .sort((a,b) => {
+        const at = a.changedAt?.toMillis?.() || 0;
+        const bt = b.changedAt?.toMillis?.() || 0;
+        return bt - at;
+      });
+
+    if (!list.length) {
+      host.innerHTML = `<div class="empty">아직 기록된 수정 이력이 없습니다.</div>`;
+      return;
+    }
+
+    host.innerHTML = list.map(item => {
+      const date = item.changedAt?.toDate?.();
+      const dateText = date
+        ? date.toLocaleString("ko-KR", {year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})
+        : "시간 정보 없음";
+      const changes = Array.isArray(item.changes) ? item.changes : [];
+
+      return `<article class="history-item">
+        <div class="history-date">${escapeHtml(dateText)}</div>
+        <div class="history-changes">
+          ${changes.length ? changes.map(c => `
+            <div class="history-change">
+              <span class="history-type ${c.type === "삭제" ? "delete" : c.type === "추가" ? "add" : "edit"}">${escapeHtml(c.type)}</span>
+              <div>
+                <strong>지원 ${escapeHtml(c.priority)}</strong>
+                <p>${escapeHtml(c.text)}</p>
+              </div>
+            </div>
+          `).join("") : `<span class="helper">변경 상세정보가 없습니다.</span>`}
+        </div>
+      </article>`;
+    }).join("");
+  } catch (e) {
+    console.error(e);
+    host.innerHTML = `<div class="empty">수정 이력을 불러오지 못했습니다. Firestore 규칙을 확인해 주세요.</div>`;
+  }
+}
+
+$("#historyBtn").addEventListener("click", async () => {
+  if (!currentStudentModalKey) return;
+  const panel = $("#historyPanel");
+  const opening = panel.classList.contains("hidden");
+  panel.classList.toggle("hidden");
+  if (opening) {
+    await loadStudentHistory(currentStudentModalKey);
+    panel.scrollIntoView({behavior:"smooth", block:"nearest"});
+  }
+});
 
 $("#studentModalCloseBtn").addEventListener("click", closeStudentModal);
 $("#studentModal").addEventListener("click", (e) => {
@@ -330,12 +414,24 @@ function renderTable() {
 }
 function render() {
   renderStats();
+  renderStatusSummary();
   renderClassStatus();
   renderDuplicates();
   renderTable();
 }
-["filterClass","filterType","viewMode"].forEach(id => $("#"+id).addEventListener("change", renderTable));
+["filterClass","filterType","filterStatus","viewMode"].forEach(id => $("#"+id).addEventListener("change", () => {
+  renderStatusSummary();
+  renderTable();
+}));
 $("#searchInput").addEventListener("input", renderTable);
+document.querySelectorAll(".status-summary-card").forEach(btn => {
+  btn.addEventListener("click", () => {
+    $("#filterStatus").value = btn.dataset.status || "";
+    renderStatusSummary();
+    renderTable();
+    document.querySelector(".filters").scrollIntoView({behavior:"smooth", block:"center"});
+  });
+});
 
 // 학생 이름 클릭은 표가 다시 그려져도 항상 작동하도록 이벤트 위임 방식 사용
 $("#applicationTable").addEventListener("click", (event) => {
