@@ -6,6 +6,7 @@
   <title>교사용 | 2027 수시지원 관리</title>
   <link rel="stylesheet" href="./style.css?v=13.2" />
   <link rel="stylesheet" href="./stats-v14.css?v=14.0" />
+  <link rel="stylesheet" href="./deadlines-v15.css?v=15.0" />
 </head>
 <body>
   <header class="topbar">
@@ -149,6 +150,47 @@
 
 
 
+
+
+      <section class="card deadline-card">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">원서접수 기간 관리</span>
+            <h2>마감일 · 미접수 위험학생</h2>
+            <p>대학 또는 특정 전형의 원서접수 마감일을 등록하면 미접수 지원을 자동으로 찾아줍니다.</p>
+          </div>
+          <div class="deadline-head-actions">
+            <button id="deadlineManageBtn" class="secondary">마감일 관리</button>
+          </div>
+        </div>
+
+        <div class="deadline-summary-grid">
+          <button class="deadline-summary-card urgent" data-risk-filter="urgent">
+            <span>오늘·마감 지남</span><strong id="deadlineUrgentCount">0</strong><small>건</small>
+          </button>
+          <button class="deadline-summary-card soon" data-risk-filter="soon">
+            <span>D-1 ~ D-2</span><strong id="deadlineSoonCount">0</strong><small>건</small>
+          </button>
+          <button class="deadline-summary-card final" data-risk-filter="final">
+            <span>최종결정 후 미접수</span><strong id="finalUnsubmittedCount">0</strong><small>건</small>
+          </button>
+          <button class="deadline-summary-card partial" data-risk-filter="partial">
+            <span>일부만 접수완료</span><strong id="partialStudentCount">0</strong><small>명</small>
+          </button>
+          <button class="deadline-summary-card empty" data-risk-filter="empty">
+            <span>지원정보 없음</span><strong id="noApplicationCount">0</strong><small>명</small>
+          </button>
+        </div>
+
+        <div class="risk-toolbar">
+          <div>
+            <strong id="riskTitle">확인 필요 항목</strong>
+            <span id="riskSub" class="helper"></span>
+          </div>
+          <button id="riskClearFilterBtn" class="ghost small-btn">전체 보기</button>
+        </div>
+        <div id="riskList" class="risk-list"></div>
+      </section>
 
       <section class="card analytics-card">
         <div class="section-head">
@@ -337,6 +379,42 @@
 
 
 
+
+  <div id="deadlineModal" class="modal-backdrop hidden" aria-hidden="true">
+    <div class="modal-card deadline-modal" role="dialog" aria-modal="true" aria-labelledby="deadlineModalTitle">
+      <div class="modal-head">
+        <div>
+          <span class="eyebrow">교사용</span>
+          <h2 id="deadlineModalTitle">원서접수 마감일 관리</h2>
+          <p class="helper">대학 전체 마감일을 등록하거나, 전형명이 다른 경우 전형별로 따로 등록할 수 있습니다.</p>
+        </div>
+        <button id="deadlineModalCloseBtn" class="ghost small-btn" type="button">닫기</button>
+      </div>
+
+      <div class="deadline-form">
+        <label>대학명
+          <input id="deadlineUniversity" placeholder="예: 강원대학교" />
+        </label>
+        <label>전형명 <span class="helper">(선택)</span>
+          <input id="deadlineAdmissionName" placeholder="비워두면 해당 대학 전체에 적용" />
+        </label>
+        <label>접수 마감일시
+          <input id="deadlineAt" type="datetime-local" />
+        </label>
+        <label>메모 <span class="helper">(선택)</span>
+          <input id="deadlineMemo" placeholder="예: 인터넷 접수 18:00 마감" />
+        </label>
+        <button id="deadlineAddBtn" class="primary" type="button">마감일 등록</button>
+      </div>
+
+      <div class="deadline-rule-note">
+        같은 대학에 대학 전체 일정과 특정 전형 일정이 모두 있으면 <strong>특정 전형 일정</strong>을 우선 적용합니다.
+      </div>
+
+      <div id="deadlineList" class="deadline-list"></div>
+    </div>
+  </div>
+
   <div id="teacherClassModal" class="modal-backdrop hidden" aria-hidden="true">
     <div class="modal-card teacher-class-modal" role="dialog" aria-modal="true" aria-labelledby="teacherClassModalTitle">
       <div class="modal-head">
@@ -461,6 +539,6 @@
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./admin.js?v=14.0"></script>
+  <script type="module" src="./admin.js?v=15.0"></script>
 </body>
 </html>

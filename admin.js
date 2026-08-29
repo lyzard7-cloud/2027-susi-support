@@ -45,6 +45,9 @@ let unsubscribeTeacherClasses = null;
 let myAssignedClass = "";
 let showingMyClassOnly = false;
 let deleteTargetStudent = null;
+let deadlineRows = [];
+let unsubscribeDeadlines = null;
+let activeRiskFilter = "";
 
 function toast(message) {
   toastEl.textContent = message;
@@ -1042,6 +1045,333 @@ function renderTable() {
   });
 }
 
+
+function deadlineKeyUniversity(v = "") {
+  return normalizeUniversity(v);
+}
+
+function deadlineKeyAdmission(v = "") {
+  return normalizeAdmission(v);
+}
+
+function findDeadlineForApplication(application) {
+  const uniKey = deadlineKeyUniversity(application.university);
+  const admissionKey = deadlineKeyAdmission(application.admissionName);
+
+  const exact = deadlineRows.find(d =>
+    d.universityKey === uniKey &&
+    d.admissionKey &&
+    d.admissionKey === admissionKey
+  );
+  if (exact) return exact;
+
+  return deadlineRows.find(d =>
+    d.universityKey === uniKey &&
+    !d.admissionKey
+  ) || null;
+}
+
+function parseDeadlineLocal(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function deadlineDiffInfo(deadlineValue) {
+  const deadline = parseDeadlineLocal(deadlineValue);
+  if (!deadline) return {bucket:"none", label:"일정 오류", hours:Infinity};
+
+  const now = new Date();
+  const diffMs = deadline.getTime() - now.getTime();
+  const hours = diffMs / 3600000;
+
+  if (diffMs < 0) {
+    return {
+      bucket:"overdue",
+      label:"마감 지남",
+      hours
+    };
+  }
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dueDay = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
+  const dayDiff = Math.round((dueDay - today) / 86400000);
+
+  if (dayDiff <= 0) return {bucket:"today", label:"D-DAY", hours};
+  if (dayDiff === 1) return {bucket:"d1", label:"D-1", hours};
+  if (dayDiff === 2) return {bucket:"d2", label:"D-2", hours};
+  return {bucket:"later", label:`D-${dayDiff}`, hours};
+}
+
+function formatDeadline(value) {
+  const d = parseDeadlineLocal(value);
+  if (!d) return "일정 오류";
+  return d.toLocaleString("ko-KR", {
+    month:"2-digit", day:"2-digit",
+    hour:"2-digit", minute:"2-digit"
+  });
+}
+
+function studentSubmissionProgress(studentKey) {
+  const apps = rows.filter(r => r.studentKey === studentKey);
+  const submitted = apps.filter(r => (r.status || "검토중") === "원서접수완료").length;
+  return {
+    total: apps.length,
+    submitted,
+    partial: apps.length > 1 && submitted > 0 && submitted < apps.length
+  };
+}
+
+function buildRiskItems() {
+  const items = [];
+
+  rows.forEach(app => {
+    const status = app.status || "검토중";
+    if (status === "원서접수완료") return;
+
+    const deadline = findDeadlineForApplication(app);
+    const diff = deadline ? deadlineDiffInfo(deadline.deadlineAt) : null;
+
+    if (diff && ["overdue","today","d1","d2"].includes(diff.bucket)) {
+      items.push({
+        type: ["overdue","today"].includes(diff.bucket) ? "urgent" : "soon",
+        studentKey: app.studentKey,
+        applicationId: app.id,
+        classNo: app.classNo,
+        studentNo: app.studentNo,
+        studentName: app.studentName,
+        university: app.university,
+        department: app.department,
+        admissionName: app.admissionName,
+        status,
+        deadline,
+        diff,
+        title: `${diff.label} · ${app.university}`,
+        detail: `${app.department} · ${app.admissionName}`
+      });
+    }
+
+    if (status === "최종결정") {
+      items.push({
+        type:"final",
+        studentKey: app.studentKey,
+        applicationId: app.id,
+        classNo: app.classNo,
+        studentNo: app.studentNo,
+        studentName: app.studentName,
+        university: app.university,
+        department: app.department,
+        admissionName: app.admissionName,
+        status,
+        deadline,
+        diff,
+        title:`최종결정 후 미접수 · ${app.university}`,
+        detail:`${app.department} · ${app.admissionName}`
+      });
+    }
+  });
+
+  const uniqueStudents = new Map(rows.map(r => [r.studentKey, r]));
+  uniqueStudents.forEach((sample, studentKey) => {
+    const p = studentSubmissionProgress(studentKey);
+    if (p.partial) {
+      items.push({
+        type:"partial",
+        studentKey,
+        classNo:sample.classNo,
+        studentNo:sample.studentNo,
+        studentName:sample.studentName,
+        title:`일부만 접수완료 · ${p.submitted}/${p.total}`,
+        detail:`아직 ${p.total - p.submitted}건 미접수`
+      });
+    }
+  });
+
+  const enteredKeys = new Set(rows.map(r => r.studentKey));
+  roster.forEach(st => {
+    if (!enteredKeys.has(st.studentKey)) {
+      items.push({
+        type:"empty",
+        studentKey:st.studentKey,
+        classNo:st.classNo,
+        studentNo:st.studentNo,
+        studentName:st.studentName,
+        title:"지원정보 없음",
+        detail:"아직 지원정보가 한 건도 등록되지 않았습니다."
+      });
+    }
+  });
+
+  return items;
+}
+
+function riskTypeLabel(type) {
+  return ({
+    urgent:"오늘·마감 지남",
+    soon:"D-1 ~ D-2",
+    final:"최종결정 후 미접수",
+    partial:"일부만 접수완료",
+    empty:"지원정보 없음"
+  })[type] || "확인 필요";
+}
+
+function renderDeadlineDashboard() {
+  const risks = buildRiskItems();
+  const countType = type => risks.filter(x => x.type === type).length;
+
+  $("#deadlineUrgentCount").textContent = countType("urgent");
+  $("#deadlineSoonCount").textContent = countType("soon");
+  $("#finalUnsubmittedCount").textContent = countType("final");
+  $("#partialStudentCount").textContent = countType("partial");
+  $("#noApplicationCount").textContent = countType("empty");
+
+  document.querySelectorAll(".deadline-summary-card").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.riskFilter === activeRiskFilter);
+  });
+
+  const visible = activeRiskFilter
+    ? risks.filter(x => x.type === activeRiskFilter)
+    : risks;
+
+  $("#riskTitle").textContent = activeRiskFilter
+    ? riskTypeLabel(activeRiskFilter)
+    : "확인 필요 항목";
+  $("#riskSub").textContent = `${visible.length}건`;
+
+  const rank = {urgent:0, soon:1, final:2, partial:3, empty:4};
+  visible.sort((a,b) => {
+    if ((rank[a.type] ?? 9) !== (rank[b.type] ?? 9)) {
+      return (rank[a.type] ?? 9) - (rank[b.type] ?? 9);
+    }
+    if (a.diff && b.diff) return a.diff.hours - b.diff.hours;
+    return Number(a.classNo)-Number(b.classNo) ||
+      Number(a.studentNo)-Number(b.studentNo);
+  });
+
+  $("#riskList").innerHTML = visible.length
+    ? visible.map(item => `
+      <button type="button" class="risk-item risk-${item.type}" data-student-key="${escapeHtml(item.studentKey)}">
+        <div class="risk-main">
+          <div class="risk-tag">${escapeHtml(riskTypeLabel(item.type))}</div>
+          <strong>${escapeHtml(item.classNo)}반 ${escapeHtml(item.studentNo)}번 ${escapeHtml(item.studentName)}</strong>
+          <span>${escapeHtml(item.title)}</span>
+          <small>${escapeHtml(item.detail || "")}</small>
+        </div>
+        <div class="risk-side">
+          ${item.deadline ? `
+            <strong class="risk-dday ${item.diff?.bucket || ""}">${escapeHtml(item.diff?.label || "")}</strong>
+            <small>${escapeHtml(formatDeadline(item.deadline.deadlineAt))}</small>
+          ` : ""}
+        </div>
+      </button>
+    `).join("")
+    : `<div class="empty">현재 조건에 해당하는 확인 필요 항목이 없습니다.</div>`;
+
+  $("#riskList").querySelectorAll(".risk-item").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const studentKey = btn.dataset.studentKey;
+      if (rows.some(r => r.studentKey === studentKey)) {
+        openStudentModal(studentKey);
+      } else {
+        toast("이 학생은 아직 지원정보가 없어 학생 지원창을 열 수 없습니다.");
+      }
+    });
+  });
+}
+
+function renderDeadlineList() {
+  const host = $("#deadlineList");
+  const data = [...deadlineRows].sort((a,b) =>
+    String(a.deadlineAt || "").localeCompare(String(b.deadlineAt || "")) ||
+    String(a.university || "").localeCompare(String(b.university || ""), "ko")
+  );
+
+  host.innerHTML = data.length ? data.map(d => {
+    const diff = deadlineDiffInfo(d.deadlineAt);
+    return `
+      <div class="deadline-list-item">
+        <div class="deadline-list-main">
+          <div>
+            <strong>${escapeHtml(d.university)}</strong>
+            ${d.admissionName ? `<span class="deadline-admission">${escapeHtml(d.admissionName)}</span>` : `<span class="deadline-admission">대학 전체</span>`}
+          </div>
+          <span>${escapeHtml(formatDeadline(d.deadlineAt))} · <b>${escapeHtml(diff.label)}</b></span>
+          ${d.memo ? `<small>${escapeHtml(d.memo)}</small>` : ""}
+        </div>
+        <button class="ghost small-btn deadline-delete-btn" data-id="${escapeHtml(d.id)}">삭제</button>
+      </div>
+    `;
+  }).join("") : `<div class="empty">등록된 원서접수 마감일이 없습니다.</div>`;
+
+  host.querySelectorAll(".deadline-delete-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("이 마감일을 삭제하시겠습니까?")) return;
+      try {
+        await deleteDoc(doc(db, "applicationDeadlines", btn.dataset.id));
+        toast("마감일을 삭제했습니다.");
+      } catch (e) {
+        console.error(e);
+        toast("마감일 삭제에 실패했습니다.");
+      }
+    });
+  });
+}
+
+function openDeadlineModal() {
+  $("#deadlineUniversity").value = "";
+  $("#deadlineAdmissionName").value = "";
+  $("#deadlineAt").value = "";
+  $("#deadlineMemo").value = "";
+  renderDeadlineList();
+  $("#deadlineModal").classList.remove("hidden");
+  $("#deadlineModal").setAttribute("aria-hidden", "false");
+}
+
+function closeDeadlineModal() {
+  $("#deadlineModal").classList.add("hidden");
+  $("#deadlineModal").setAttribute("aria-hidden", "true");
+}
+
+async function addDeadline() {
+  const university = $("#deadlineUniversity").value.trim();
+  const admissionName = $("#deadlineAdmissionName").value.trim();
+  const deadlineAt = $("#deadlineAt").value;
+  const memo = $("#deadlineMemo").value.trim();
+
+  if (!university) return toast("대학명을 입력해 주세요.");
+  if (!deadlineAt) return toast("접수 마감일시를 입력해 주세요.");
+
+  const btn = $("#deadlineAddBtn");
+  btn.disabled = true;
+  btn.textContent = "등록 중...";
+
+  try {
+    await addDoc(collection(db, "applicationDeadlines"), {
+      university,
+      universityKey: deadlineKeyUniversity(university),
+      admissionName,
+      admissionKey: admissionName ? deadlineKeyAdmission(admissionName) : "",
+      deadlineAt,
+      memo,
+      createdAt: serverTimestamp(),
+      createdByUid: auth.currentUser?.uid || "",
+      createdByEmail: auth.currentUser?.email || ""
+    });
+
+    $("#deadlineUniversity").value = "";
+    $("#deadlineAdmissionName").value = "";
+    $("#deadlineAt").value = "";
+    $("#deadlineMemo").value = "";
+    toast("원서접수 마감일을 등록했습니다.");
+  } catch (e) {
+    console.error(e);
+    toast("마감일 등록에 실패했습니다.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "마감일 등록";
+  }
+}
+
 function countBy(data, keyFn) {
   const map = new Map();
   data.forEach(item => {
@@ -1217,6 +1547,7 @@ function render() {
   renderDuplicates();
   renderTable();
   renderAnalytics();
+  renderDeadlineDashboard();
 }
 ["filterClass","filterType","filterStatus","filterResult","viewMode"].forEach(id => $("#"+id).addEventListener("change", () => {
   if (id === "filterClass") {
@@ -1280,6 +1611,22 @@ $("#filterDuplicateReview").addEventListener("change", () => {
 });
 $("#analyticsDetailCloseBtn").addEventListener("click", closeAnalyticsDetail);
 $("#analyticsCsvBtn").addEventListener("click", exportAnalyticsCsv);
+$("#deadlineManageBtn").addEventListener("click", openDeadlineModal);
+$("#deadlineModalCloseBtn").addEventListener("click", closeDeadlineModal);
+$("#deadlineAddBtn").addEventListener("click", addDeadline);
+$("#deadlineModal").addEventListener("click", (e) => {
+  if (e.target === $("#deadlineModal")) closeDeadlineModal();
+});
+document.querySelectorAll(".deadline-summary-card").forEach(btn => {
+  btn.addEventListener("click", () => {
+    activeRiskFilter = btn.dataset.riskFilter || "";
+    renderDeadlineDashboard();
+  });
+});
+$("#riskClearFilterBtn").addEventListener("click", () => {
+  activeRiskFilter = "";
+  renderDeadlineDashboard();
+});
 document.querySelectorAll(".status-summary-card").forEach(btn => {
   btn.addEventListener("click", () => {
     $("#filterStatus").value = btn.dataset.status || "";
@@ -1472,6 +1819,7 @@ document.addEventListener("keydown", (e) => {
     if (!$("#studentModal").classList.contains("hidden")) closeStudentModal();
     if (!$("#teacherClassModal").classList.contains("hidden")) closeTeacherClassModal();
     if (!$("#deleteStudentModal").classList.contains("hidden")) closeDeleteStudentModal();
+    if (!$("#deadlineModal").classList.contains("hidden")) closeDeadlineModal();
   }
 });
 
@@ -1567,6 +1915,16 @@ onAuthStateChanged(auth, user => {
       console.error(err);
     });
 
+    if (unsubscribeDeadlines) unsubscribeDeadlines();
+    unsubscribeDeadlines = onSnapshot(collection(db, "applicationDeadlines"), snap => {
+      deadlineRows = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      renderDeadlineList();
+      renderDeadlineDashboard();
+    }, err => {
+      console.error(err);
+      toast("마감일 정보를 불러오지 못했습니다.");
+    });
+
     unsubscribeDuplicateReviews = onSnapshot(collection(db, "duplicateReviews"), snap => {
       duplicateReviewMap = new Map(snap.docs.map(d => [d.id, {id:d.id, ...d.data()}]));
       renderStats();
@@ -1594,6 +1952,7 @@ onAuthStateChanged(auth, user => {
         String(a.studentName).localeCompare(String(b.studentName), "ko")
       );
       renderClassStatus();
+      renderDeadlineDashboard();
     }, err => {
       console.error(err);
       $("#rosterUploadStatus").textContent = "학생 명단 조회 권한을 확인해 주세요.";
@@ -1613,6 +1972,9 @@ onAuthStateChanged(auth, user => {
     if (unsubscribeLocks) { unsubscribeLocks(); unsubscribeLocks = null; }
     if (unsubscribeDuplicateReviews) { unsubscribeDuplicateReviews(); unsubscribeDuplicateReviews = null; }
     if (unsubscribeTeacherClasses) { unsubscribeTeacherClasses(); unsubscribeTeacherClasses = null; }
+    if (unsubscribeDeadlines) { unsubscribeDeadlines(); unsubscribeDeadlines = null; }
+    deadlineRows = [];
+    activeRiskFilter = "";
     teacherClassMap = new Map();
     myAssignedClass = "";
     showingMyClassOnly = false;

@@ -1,0 +1,46 @@
+
+.deadline-card{margin-bottom:18px}
+.deadline-head-actions{display:flex;gap:8px}
+.deadline-summary-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.deadline-summary-card{border:1px solid #dde3ec;background:#fff;border-radius:13px;padding:12px;text-align:left;cursor:pointer}
+.deadline-summary-card span{display:block;font-size:11px;color:#697587}
+.deadline-summary-card strong{font-size:22px;display:inline-block;margin-top:6px}
+.deadline-summary-card small{margin-left:3px;color:#697587}
+.deadline-summary-card.urgent{background:#fff4f4;border-color:#efcaca}
+.deadline-summary-card.soon{background:#fff9ee;border-color:#ecd8aa}
+.deadline-summary-card.final{background:#fff7f0;border-color:#ead2bb}
+.deadline-summary-card.partial{background:#f5f8ff;border-color:#cdd9f1}
+.deadline-summary-card.empty{background:#f7f8fa;border-color:#d9dee6}
+.deadline-summary-card.active{box-shadow:0 0 0 2px rgba(65,96,180,.16);border-color:#8099d8}
+.risk-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid #e2e6ed;padding-top:12px;margin-bottom:8px}
+.risk-list{display:flex;flex-direction:column;gap:8px}
+.risk-item{display:flex;width:100%;justify-content:space-between;align-items:center;gap:14px;text-align:left;border:1px solid #dde3ec;background:#fff;border-radius:12px;padding:11px 12px;cursor:pointer}
+.risk-item:hover{background:#fafcff}
+.risk-main{display:grid;grid-template-columns:auto auto 1fr;gap:4px 9px;align-items:center;min-width:0}
+.risk-main .risk-tag{grid-row:1 / span 2;font-size:10px;font-weight:800;border-radius:999px;padding:5px 7px;background:#edf1f7;color:#526070}
+.risk-main strong{font-size:12px}
+.risk-main span{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.risk-main small{grid-column:2 / 4;font-size:10px;color:#778294}
+.risk-urgent{border-color:#efc6c6;background:#fffafa}
+.risk-soon{border-color:#ecd7ad;background:#fffdf7}
+.risk-final{border-color:#ead1ba}
+.risk-side{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:0 0 auto}
+.risk-side small{font-size:10px;color:#788394}
+.risk-dday{font-size:12px;border-radius:999px;padding:5px 8px;background:#eef2f8}
+.risk-dday.overdue,.risk-dday.today{background:#ffe8e8;color:#b83333}
+.risk-dday.d1,.risk-dday.d2{background:#fff1cc;color:#8c6200}
+.deadline-modal{width:min(800px,100%);max-height:86vh;overflow:auto}
+.deadline-form{display:grid;grid-template-columns:1.1fr 1.1fr 1fr 1.2fr auto;gap:8px;align-items:end}
+.deadline-form label{font-size:11px}
+.deadline-form input{padding:9px}
+.deadline-rule-note{margin:12px 0;background:#f7f9fc;border:1px solid #dde3ec;border-radius:10px;padding:9px 11px;font-size:11px;color:#607086}
+.deadline-list{display:flex;flex-direction:column;gap:8px}
+.deadline-list-item{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid #dde3ec;border-radius:11px;padding:10px 12px;background:#fbfcfe}
+.deadline-list-main{display:flex;flex-direction:column;gap:4px;min-width:0}
+.deadline-list-main>div{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.deadline-list-main strong{font-size:13px}
+.deadline-list-main>span{font-size:11px}
+.deadline-list-main small{font-size:10px;color:#748094}
+.deadline-admission{font-size:10px;border-radius:999px;padding:4px 7px;background:#eef2f8;color:#556274}
+@media(max-width:1050px){.deadline-summary-grid{grid-template-columns:repeat(3,1fr)}.deadline-form{grid-template-columns:repeat(2,1fr)}.deadline-form button{grid-column:1 / -1}}
+@media(max-width:650px){.deadline-summary-grid{grid-template-columns:repeat(2,1fr)}.risk-item{align-items:flex-start}.risk-main{grid-template-columns:1fr}.risk-main .risk-tag{grid-row:auto}.risk-main small{grid-column:auto}.risk-side{align-items:flex-start}.deadline-form{grid-template-columns:1fr}}
