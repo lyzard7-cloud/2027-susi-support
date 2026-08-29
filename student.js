@@ -30,6 +30,8 @@ const toastEl = $("#toast");
 let loadedStudentKey = null;
 let verifiedStudentKey = null;
 let verifiedAccessId = null;
+let admissionMaster = [];
+let admissionMasterLoaded = false;
 
 function toast(message) {
   toastEl.textContent = message;
@@ -71,6 +73,194 @@ function normalizeAdmission(v = "") {
   return n;
 }
 
+
+function uniqueSorted(values = []) {
+  return [...new Set(values.filter(Boolean).map(v => String(v).trim()).filter(Boolean))]
+    .sort((a,b) => a.localeCompare(b, "ko"));
+}
+
+async function loadAdmissionMaster() {
+  try {
+    const snap = await getDocs(collection(db, "admissionUniversities"));
+    admissionMaster = snap.docs.map(d => ({id:d.id, ...d.data()}))
+      .sort((a,b) => String(a.university || "").localeCompare(String(b.university || ""), "ko"));
+    admissionMasterLoaded = true;
+  } catch (e) {
+    console.error("입시 자동완성 데이터 로드 실패", e);
+    admissionMaster = [];
+    admissionMasterLoaded = false;
+  }
+}
+
+function findUniversityRecord(value = "") {
+  const key = normalizeUniversity(value);
+  if (!key) return null;
+
+  return admissionMaster.find(u => {
+    if (u.universityKey === key || normalizeUniversity(u.university || "") === key) return true;
+    return (u.aliases || []).some(alias => normalizeUniversity(alias) === key);
+  }) || null;
+}
+
+function universityMatches(term = "") {
+  const q = normalize(term);
+  if (!q) return [];
+
+  return admissionMaster.filter(u => {
+    const names = [u.university, ...(u.aliases || [])];
+    return names.some(name => normalize(name).includes(q));
+  }).slice(0, 12);
+}
+
+function departmentMatches(universityValue, term = "") {
+  const u = findUniversityRecord(universityValue);
+  if (!u) return [];
+  const q = normalize(term);
+  return uniqueSorted(u.departments || [])
+    .filter(name => !q || normalize(name).includes(q))
+    .slice(0, 15);
+}
+
+function admissionMatches(universityValue, term = "") {
+  const u = findUniversityRecord(universityValue);
+  if (!u) return [];
+  const q = normalize(term);
+
+  return (u.admissions || [])
+    .filter(x => x?.name && (!q || normalize(x.name).includes(q)))
+    .sort((a,b) => String(a.name).localeCompare(String(b.name), "ko"))
+    .slice(0, 15);
+}
+
+function hideAutocompleteMenus(except = null) {
+  document.querySelectorAll(".autocomplete-menu.open").forEach(menu => {
+    if (menu !== except) menu.classList.remove("open");
+  });
+}
+
+function showAutocompleteMenu(menu, items, renderItem, onSelect) {
+  if (!items.length) {
+    menu.classList.remove("open");
+    menu.innerHTML = "";
+    return;
+  }
+
+  menu.innerHTML = items.map((item, index) =>
+    `<button type="button" class="autocomplete-option" data-index="${index}">
+      ${renderItem(item)}
+    </button>`
+  ).join("");
+  menu.classList.add("open");
+
+  menu.querySelectorAll(".autocomplete-option").forEach(btn => {
+    btn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      const item = items[Number(btn.dataset.index)];
+      onSelect(item);
+      menu.classList.remove("open");
+    });
+  });
+}
+
+function bindApplicationAutocomplete(card) {
+  const universityInput = card.querySelector(".university");
+  const departmentInput = card.querySelector(".department");
+  const admissionInput = card.querySelector(".admissionName");
+  const admissionTypeSelect = card.querySelector(".admissionType");
+
+  const universityMenu = card.querySelector(".university-menu");
+  const departmentMenu = card.querySelector(".department-menu");
+  const admissionMenu = card.querySelector(".admission-menu");
+
+  const refreshUniversity = () => {
+    const value = universityInput.value.trim();
+    if (!value || !admissionMasterLoaded) {
+      universityMenu.classList.remove("open");
+      return;
+    }
+    const items = universityMatches(value);
+    showAutocompleteMenu(
+      universityMenu,
+      items,
+      u => `<strong>${escapeHtml(u.university)}</strong>${
+        (u.aliases || []).length
+          ? `<small>${escapeHtml((u.aliases || []).slice(0,3).join(" · "))}</small>`
+          : ""
+      }`,
+      u => {
+        const previous = universityInput.value.trim();
+        universityInput.value = u.university || "";
+        if (normalizeUniversity(previous) !== normalizeUniversity(u.university || "")) {
+          departmentInput.value = "";
+          admissionInput.value = "";
+        }
+        departmentInput.focus();
+      }
+    );
+  };
+
+  const refreshDepartment = () => {
+    const items = departmentMatches(universityInput.value, departmentInput.value);
+    showAutocompleteMenu(
+      departmentMenu,
+      items,
+      name => `<strong>${escapeHtml(name)}</strong>`,
+      name => {
+        departmentInput.value = name;
+        admissionInput.focus();
+      }
+    );
+  };
+
+  const refreshAdmission = () => {
+    const items = admissionMatches(universityInput.value, admissionInput.value);
+    showAutocompleteMenu(
+      admissionMenu,
+      items,
+      item => `<strong>${escapeHtml(item.name)}</strong>${
+        item.type ? `<small>${escapeHtml(item.type)}</small>` : ""
+      }`,
+      item => {
+        admissionInput.value = item.name || "";
+        if (item.type) {
+          const allowed = [...admissionTypeSelect.options].some(o => o.value === item.type);
+          admissionTypeSelect.value = allowed ? item.type : "기타";
+        }
+      }
+    );
+  };
+
+  universityInput.addEventListener("input", refreshUniversity);
+  universityInput.addEventListener("focus", refreshUniversity);
+
+  departmentInput.addEventListener("input", refreshDepartment);
+  departmentInput.addEventListener("focus", refreshDepartment);
+
+  admissionInput.addEventListener("input", refreshAdmission);
+  admissionInput.addEventListener("focus", refreshAdmission);
+
+  admissionInput.addEventListener("blur", () => {
+    const u = findUniversityRecord(universityInput.value);
+    if (!u) return;
+    const exact = (u.admissions || []).find(x =>
+      normalizeAdmission(x.name || "") === normalizeAdmission(admissionInput.value)
+    );
+    if (exact?.type) {
+      const allowed = [...admissionTypeSelect.options].some(o => o.value === exact.type);
+      admissionTypeSelect.value = allowed ? exact.type : "기타";
+    }
+  });
+}
+
+document.addEventListener("mousedown", (e) => {
+  if (!e.target.closest(".autocomplete-wrap")) hideAutocompleteMenus();
+});
+
+async function getStudentLock(studentKeyValue) {
+  const snap = await getDoc(doc(db, "studentLocks", studentKeyValue));
+  return snap.exists() && snap.data().locked === true;
+}
+
 function studentKey() {
   const c = $("#classNo").value.trim();
   const n = $("#studentNo").value.trim().padStart(2, "0");
@@ -106,10 +296,16 @@ function applicationTemplate(data = {}) {
     </div>
     <div class="application-grid">
       <label>대학
-        <input class="university" value="${escapeHtml(data.university || "")}" placeholder="예: 강원대학교" />
+        <div class="autocomplete-wrap">
+          <input class="university" value="${escapeHtml(data.university || "")}" placeholder="예: 강원 → 강원대학교" autocomplete="off" />
+          <div class="autocomplete-menu university-menu"></div>
+        </div>
       </label>
       <label>학과
-        <input class="department" value="${escapeHtml(data.department || "")}" placeholder="예: 간호학과" />
+        <div class="autocomplete-wrap">
+          <input class="department" value="${escapeHtml(data.department || "")}" placeholder="대학 선택 후 학과 검색" autocomplete="off" />
+          <div class="autocomplete-menu department-menu"></div>
+        </div>
       </label>
       <label>전형유형
         <select class="admissionType">
@@ -117,7 +313,10 @@ function applicationTemplate(data = {}) {
         </select>
       </label>
       <label>전형명
-        <input class="admissionName" value="${escapeHtml(data.admissionName || "")}" placeholder="예: 지역인재전형" />
+        <div class="autocomplete-wrap">
+          <input class="admissionName" value="${escapeHtml(data.admissionName || "")}" placeholder="예: 지 → 지역인재전형" autocomplete="off" />
+          <div class="autocomplete-menu admission-menu"></div>
+        </div>
       </label>
       <label>지원상태
         <select class="status">
@@ -134,6 +333,7 @@ function applicationTemplate(data = {}) {
     div.remove(); renumber();
   });
   applicationsEl.appendChild(div);
+  bindApplicationAutocomplete(div);
   renumber();
 }
 
@@ -350,6 +550,7 @@ $("#submitBtn").addEventListener("click", async () => {
   }
 });
 
+await loadAdmissionMaster();
 applicationTemplate();
 
 ["#classNo","#studentNo","#studentName","#studentPin"].forEach(sel=>{const el=document.querySelector(sel);["input","change"].forEach(evt=>el?.addEventListener(evt,()=>{verifiedStudentKey=null;verifiedAccessId=null;$("#loadStatus").textContent="";}));});

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>입시데이터 관리 | 2027 수시지원</title>
+  <link rel="stylesheet" href="./style.css?v=13.2" />
+  <link rel="stylesheet" href="./master-v16.css?v=16.0" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">S</span>
+      <div>
+        <div class="brand-title">2027 수시지원 관리</div>
+        <div class="brand-subtitle">대학·학과·전형 마스터</div>
+      </div>
+    </div>
+    <a class="link-button" href="./admin.html">관리자 대시보드</a>
+  </header>
+
+  <main class="container master-page">
+    <section id="masterWait" class="card">
+      <h2>최고관리자 권한 확인 중</h2>
+      <p class="helper">입시데이터 관리 권한을 확인하고 있습니다.</p>
+    </section>
+
+    <section id="masterDashboard" class="hidden">
+      <div class="dashboard-heading">
+        <div>
+          <span class="eyebrow">최고관리자 전용</span>
+          <h1>대학·학과·전형 자동완성 데이터</h1>
+          <p>매년 공식 모집요강을 기준으로 정리한 엑셀/CSV를 업로드하면 학생 입력 화면에 즉시 반영됩니다.</p>
+        </div>
+      </div>
+
+      <section class="master-summary-grid">
+        <div class="stat-card"><span>대학</span><strong id="masterUniversityCount">0</strong><small>개</small></div>
+        <div class="stat-card"><span>학과·모집단위</span><strong id="masterDepartmentCount">0</strong><small>개</small></div>
+        <div class="stat-card"><span>전형명</span><strong id="masterAdmissionCount">0</strong><small>개</small></div>
+        <div class="stat-card"><span>학년도</span><strong id="masterYear">-</strong></div>
+      </section>
+
+      <section class="card master-upload-card">
+        <div class="section-head">
+          <div>
+            <h2>입시데이터 업로드</h2>
+            <p>엑셀(.xlsx, .xls) 또는 CSV의 첫 번째 시트를 읽습니다. 업로드하면 기존 자동완성 데이터 전체를 새 자료로 교체합니다.</p>
+          </div>
+        </div>
+
+        <div class="master-columns">
+          <strong>권장 열 이름</strong>
+          <span>학년도</span><span>대학명</span><span>대학별칭</span><span>모집단위(학과)</span><span>전형유형</span><span>전형명</span>
+        </div>
+
+        <div class="master-note">
+          대학별칭은 쉼표로 여러 개 입력할 수 있습니다. 예: <code>강원대, 강대</code><br>
+          한 행에 대학명만 있어도 대학은 등록되며, 학과나 전형이 있는 행에서 해당 항목을 자동으로 합칩니다.
+        </div>
+
+        <div class="master-actions">
+          <input id="masterFile" type="file" accept=".xlsx,.xls,.csv" />
+          <button id="masterUploadBtn" class="primary">업로드 및 전체 교체</button>
+          <button id="masterTemplateBtn" class="ghost">CSV 양식 다운로드</button>
+        </div>
+        <div id="masterUploadStatus" class="helper"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h2>현재 등록된 대학</h2>
+            <p id="masterListCount">0개 대학</p>
+          </div>
+          <input id="masterSearch" class="master-search" placeholder="대학명 검색" />
+        </div>
+        <div id="masterList" class="master-list"></div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script type="module" src="./master.js?v=16.0"></script>
+</body>
+</html>

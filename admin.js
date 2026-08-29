@@ -20,10 +20,12 @@ function updatePinAdminUI(user = auth.currentUser) {
   const allowed = isPinAdmin(user);
   const genBtn = document.querySelector("#generatePinsBtn");
   const exportBtn = document.querySelector("#exportPinsBtn");
+  const masterBtn = document.querySelector("#masterDataBtn");
   const note = document.querySelector("#pinAdminOnlyNote");
 
   if (genBtn) genBtn.classList.toggle("hidden", !allowed);
   if (exportBtn) exportBtn.classList.toggle("hidden", !allowed);
+  if (masterBtn) masterBtn.classList.toggle("hidden", !allowed);
   if (note) {
     note.classList.toggle("hidden", allowed);
     if (!allowed) note.textContent = "PIN 생성·재발급 및 PIN 목록 다운로드는 최고관리자만 사용할 수 있습니다.";
@@ -1996,6 +1998,11 @@ function downloadCsv(filename, tableRows) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+$("#masterDataBtn").addEventListener("click", () => {
+  if (!isPinAdmin()) return toast("최고관리자만 입시데이터를 관리할 수 있습니다.");
+  window.location.href = "./master.html";
+});
 
 $("#backupBtn").addEventListener("click", () => {
   if (!rows.length && !roster.length) return toast("백업할 데이터가 없습니다.");
