@@ -1,7 +1,5 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import {
-  getFirestore, collection, onSnapshot, writeBatch, doc, getDocs,
-  serverTimestamp, query, where, updateDoc, addDoc, setDoc, getDoc, deleteDoc
+  initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js"; import {   getFirestore, collection, onSnapshot, writeBatch, doc, getDocs, serverTimestamp, query, where, updateDoc, addDoc, setDoc, getDoc, deleteDoc
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
@@ -421,7 +419,7 @@ async function saveDuplicateReview(button) {
       groupKey: key,
       status,
       memo,
-      updatedAt: serverTimestamp, query, where(),
+      updatedAt: serverTimestamp(),
       updatedByUid: auth.currentUser?.uid || "",
       updatedByEmail: auth.currentUser?.email || ""
     }, {merge:true});
@@ -582,7 +580,7 @@ $("#teacherClassSaveBtn").addEventListener("click", async () => {
       batch.set(ref, {
         email,
         classNo,
-        updatedAt: serverTimestamp, query, where(),
+        updatedAt: serverTimestamp(),
         updatedByUid: auth.currentUser?.uid || ""
       }, {merge:true});
     }
@@ -634,7 +632,7 @@ $("#generatePinsBtn").addEventListener("click", async () => {
   try {
     $("#generatePinsBtn").disabled=true; $("#rosterUploadStatus").textContent="PIN을 생성하는 중입니다...";
     const oldAccess=await getDocs(collection(db,"studentAccess")); const batch=writeBatch(db); oldAccess.forEach(d=>batch.delete(d.ref));
-    for (const st of roster){const pin=generatePin();const accessId=await accessIdFor(st.studentKey,pin);batch.update(doc(db,"students",st.id),{pin,accessId});batch.set(doc(db,"studentAccess",accessId),{studentKey:st.studentKey,classNo:st.classNo,studentNo:st.studentNo,createdAt:serverTimestamp, query, where()});}
+    for (const st of roster){const pin=generatePin();const accessId=await accessIdFor(st.studentKey,pin);batch.update(doc(db,"students",st.id),{pin,accessId});batch.set(doc(db,"studentAccess",accessId),{studentKey:st.studentKey,classNo:st.classNo,studentNo:st.studentNo,createdAt:serverTimestamp()});}
     await batch.commit(); $("#rosterUploadStatus").textContent=`${roster.length}명의 새 PIN을 생성했습니다.`; toast("PIN 재발급이 완료되었습니다.");
   } catch(e){console.error(e);toast(e.message||"PIN 생성 중 오류가 발생했습니다.");} finally{$("#generatePinsBtn").disabled=false;}
 });

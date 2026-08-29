@@ -151,7 +151,5 @@
 .danger-eyebrow{background:#fff0f0!important;color:#b73737!important}
 .delete-student-modal{width:min(520px,100%)}
 .delete-warning{border:1px solid #efc1c1;background:#fff6f6;border-radius:12px;padding:13px 15px;margin-bottom:16px;color:#6f3535;font-size:13px;line-height:1.6}
-.delete-warning strong{font-weight:850}
 .delete-warning ul{margin:8px 0 0 18px;padding:0}
 .delete-warning li{margin:3px 0}
-@media(max-width:650px){.delete-student-modal .modal-actions{flex-direction:column}.delete-student-modal .modal-actions button{width:100%}}

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>교사용 | 2027 수시지원 관리</title>
-  <link rel="stylesheet" href="./style.css?v=13.0" />
+  <link rel="stylesheet" href="./style.css?v=13.2" />
 </head>
 <body>
   <header class="topbar">
@@ -292,7 +292,7 @@
     </div>
   </div>
 
-
+  
   <div id="deleteStudentModal" class="modal-backdrop hidden" aria-hidden="true">
     <div class="modal-card delete-student-modal" role="dialog" aria-modal="true" aria-labelledby="deleteStudentModalTitle">
       <div class="modal-head">
@@ -305,13 +305,13 @@
       </div>
 
       <div class="delete-warning">
-        <strong id="deleteStudentNameLabel">학생</strong>의 다음 데이터를 모두 삭제합니다.
+        <strong id="deleteStudentNameLabel">학생</strong>의 관련 데이터를 모두 삭제합니다.
         <ul>
-          <li>지원 대학·학과·전형 정보</li>
-          <li>지원정보 수정 이력</li>
-          <li>학생 명단 정보</li>
+          <li>지원정보</li>
+          <li>수정 이력</li>
+          <li>학생 명단</li>
           <li>PIN 인증정보</li>
-          <li>지원안 잠금 정보</li>
+          <li>지원안 잠금</li>
           <li>학생 인증 세션</li>
         </ul>
       </div>
@@ -319,7 +319,6 @@
       <label>삭제 확인을 위해 학생 이름을 입력하세요.
         <input id="deleteStudentConfirmName" autocomplete="off" placeholder="학생 이름 입력" />
       </label>
-
       <div id="deleteStudentError" class="error-text"></div>
 
       <div class="modal-actions">
@@ -329,7 +328,7 @@
     </div>
   </div>
 
-  <div id="studentModal" class="modal-backdrop hidden" aria-hidden="true">
+<div id="studentModal" class="modal-backdrop hidden" aria-hidden="true">
     <div class="modal-card student-detail-modal" role="dialog" aria-modal="true" aria-labelledby="studentModalTitle">
       <div class="modal-head">
         <div>
@@ -394,6 +393,6 @@
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./admin.js?v=13.1"></script>
+  <script type="module" src="./admin.js?v=13.2"></script>
 </body>
 </html>
