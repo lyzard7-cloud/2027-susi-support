@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>위험학생 관리 | 2027 수시지원</title>
+  <link rel="stylesheet" href="./style.css?v=13.2" />
+  <link rel="stylesheet" href="./deadlines-v15.css?v=15.0" />
+  <link rel="stylesheet" href="./risk-v15_1.css?v=15.1" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">S</span>
+      <div>
+        <div class="brand-title">2027 수시지원 관리</div>
+        <div class="brand-subtitle">위험학생 상세 관리</div>
+      </div>
+    </div>
+    <a class="link-button" href="./admin.html">관리자 대시보드</a>
+  </header>
+
+  <main class="container risk-page">
+    <section id="riskLoginWait" class="card">
+      <h2>교사 로그인 확인 중</h2>
+      <p class="helper">관리자 로그인 상태를 확인하고 있습니다.</p>
+    </section>
+
+    <section id="riskDashboard" class="hidden">
+      <div class="risk-page-heading">
+        <div>
+          <span class="eyebrow">상세관리</span>
+          <h1>위험학생 · 미입력 학생</h1>
+          <p id="riskPageSync">데이터를 불러오는 중입니다.</p>
+        </div>
+      </div>
+
+      <section class="card risk-filter-card">
+        <div class="risk-filter-grid">
+          <label>위험 유형
+            <select id="riskTypeFilter">
+              <option value="">전체</option>
+              <option value="urgent">오늘·마감 지남</option>
+              <option value="soon">D-1 ~ D-2</option>
+              <option value="final">최종결정 후 미접수</option>
+              <option value="partial">일부만 접수완료</option>
+              <option value="empty">지원정보 없음</option>
+            </select>
+          </label>
+          <label>반
+            <select id="riskClassFilter">
+              <option value="">전체 반</option>
+              <option value="1">1반</option><option value="2">2반</option><option value="3">3반</option>
+              <option value="4">4반</option><option value="5">5반</option><option value="6">6반</option>
+              <option value="7">7반</option><option value="8">8반</option><option value="9">9반</option>
+            </select>
+          </label>
+          <label>학생 검색
+            <input id="riskSearch" placeholder="이름 검색" />
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h2 id="riskListTitle">위험학생 목록</h2>
+            <p id="riskListCount">0건</p>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>유형</th>
+                <th>학생</th>
+                <th>대학</th>
+                <th>학과</th>
+                <th>전형명</th>
+                <th>현재상태</th>
+                <th>마감</th>
+              </tr>
+            </thead>
+            <tbody id="riskDetailTable"></tbody>
+          </table>
+        </div>
+
+        <div class="risk-pagination">
+          <button id="riskPrevBtn" class="ghost">이전</button>
+          <span id="riskPageInfo">1 / 1</span>
+          <button id="riskNextBtn" class="ghost">다음</button>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="./risk.js?v=15.1"></script>
+</body>
+</html>

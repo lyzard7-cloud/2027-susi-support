@@ -1215,6 +1215,12 @@ function riskTypeLabel(type) {
   })[type] || "확인 필요";
 }
 
+function openRiskPage(filter = "") {
+  const url = new URL("./risk.html", window.location.href);
+  if (filter) url.searchParams.set("filter", filter);
+  window.open(url.href, "_blank", "noopener");
+}
+
 function renderDeadlineDashboard() {
   const risks = buildRiskItems();
   const countType = type => risks.filter(x => x.type === type).length;
@@ -1225,28 +1231,24 @@ function renderDeadlineDashboard() {
   $("#partialStudentCount").textContent = countType("partial");
   $("#noApplicationCount").textContent = countType("empty");
 
-  document.querySelectorAll(".deadline-summary-card").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.riskFilter === activeRiskFilter);
-  });
-
-  const visible = activeRiskFilter
-    ? risks.filter(x => x.type === activeRiskFilter)
-    : risks;
-
-  $("#riskTitle").textContent = activeRiskFilter
-    ? riskTypeLabel(activeRiskFilter)
-    : "확인 필요 항목";
-  $("#riskSub").textContent = `${visible.length}건`;
-
+  // 메인 대시보드에는 실제로 급한 항목만 최대 10건 노출
   const rank = {urgent:0, soon:1, final:2, partial:3, empty:4};
-  visible.sort((a,b) => {
-    if ((rank[a.type] ?? 9) !== (rank[b.type] ?? 9)) {
-      return (rank[a.type] ?? 9) - (rank[b.type] ?? 9);
-    }
-    if (a.diff && b.diff) return a.diff.hours - b.diff.hours;
-    return Number(a.classNo)-Number(b.classNo) ||
-      Number(a.studentNo)-Number(b.studentNo);
-  });
+  const visible = risks
+    .filter(x => x.type !== "empty")
+    .sort((a,b) => {
+      if ((rank[a.type] ?? 9) !== (rank[b.type] ?? 9)) {
+        return (rank[a.type] ?? 9) - (rank[b.type] ?? 9);
+      }
+      if (a.diff && b.diff) return a.diff.hours - b.diff.hours;
+      return Number(a.classNo)-Number(b.classNo) ||
+        Number(a.studentNo)-Number(b.studentNo);
+    })
+    .slice(0, 10);
+
+  $("#riskTitle").textContent = "긴급 확인 항목";
+  $("#riskSub").textContent = risks.length
+    ? `전체 ${risks.length}건 중 우선순위 10건만 표시`
+    : "현재 확인 필요 항목 없음";
 
   $("#riskList").innerHTML = visible.length
     ? visible.map(item => `
@@ -1265,15 +1267,13 @@ function renderDeadlineDashboard() {
         </div>
       </button>
     `).join("")
-    : `<div class="empty">현재 조건에 해당하는 확인 필요 항목이 없습니다.</div>`;
+    : `<div class="empty">현재 긴급 확인 항목이 없습니다.</div>`;
 
   $("#riskList").querySelectorAll(".risk-item").forEach(btn => {
     btn.addEventListener("click", () => {
       const studentKey = btn.dataset.studentKey;
       if (rows.some(r => r.studentKey === studentKey)) {
         openStudentModal(studentKey);
-      } else {
-        toast("이 학생은 아직 지원정보가 없어 학생 지원창을 열 수 없습니다.");
       }
     });
   });
@@ -1619,14 +1619,11 @@ $("#deadlineModal").addEventListener("click", (e) => {
 });
 document.querySelectorAll(".deadline-summary-card").forEach(btn => {
   btn.addEventListener("click", () => {
-    activeRiskFilter = btn.dataset.riskFilter || "";
-    renderDeadlineDashboard();
+    openRiskPage(btn.dataset.riskFilter || "");
   });
 });
-$("#riskClearFilterBtn").addEventListener("click", () => {
-  activeRiskFilter = "";
-  renderDeadlineDashboard();
-});
+$("#riskPageBtn").addEventListener("click", () => openRiskPage(""));
+$("#riskAllBtn").addEventListener("click", () => openRiskPage(""));
 document.querySelectorAll(".status-summary-card").forEach(btn => {
   btn.addEventListener("click", () => {
     $("#filterStatus").value = btn.dataset.status || "";
