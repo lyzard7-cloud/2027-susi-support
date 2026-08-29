@@ -500,6 +500,445 @@ function renderDuplicates() {
   });
 }
 
+
+function getStudentApplications(studentKey) {
+  return rows
+    .filter(r => r.studentKey === studentKey)
+    .sort((a,b)=>(a.priority||99)-(b.priority||99));
+}
+
+function isStudentLocked(studentKey) {
+  return lockMap.get(studentKey)?.locked === true;
+}
+
+async function toggleStudentLock(studentKey) {
+  if (!studentKey) return;
+  const currentlyLocked = isStudentLocked(studentKey);
+
+  try {
+    await setDoc(doc(db, "studentLocks", studentKey), {
+      locked: !currentlyLocked,
+      updatedAt: serverTimestamp(),
+      updatedByUid: auth.currentUser?.uid || ""
+    }, {merge:true});
+
+    toast(currentlyLocked
+      ? "학생 지원안 잠금을 해제했습니다."
+      : "학생 지원안을 잠갔습니다.");
+  } catch (e) {
+    console.error(e);
+    toast("잠금 상태 변경에 실패했습니다.");
+  }
+}
+
+function findRosterStudent(studentKey) {
+  return roster.find(r => r.studentKey === studentKey) || null;
+}
+
+function openDeleteStudentModal(studentKey) {
+  if (!isPinAdmin()) return toast("최고관리자만 학생 데이터를 삭제할 수 있습니다.");
+
+  const apps = getStudentApplications(studentKey);
+  const rosterStudent = findRosterStudent(studentKey);
+  const first = apps[0] || rosterStudent;
+  if (!first) return toast("학생 정보를 찾을 수 없습니다.");
+
+  deleteTargetStudent = {
+    studentKey,
+    classNo: first.classNo || "",
+    studentNo: first.studentNo || "",
+    studentName: first.studentName || "",
+    rosterId: rosterStudent?.id || null,
+    accessId: rosterStudent?.accessId || null
+  };
+
+  $("#deleteStudentNameLabel").textContent =
+    `${deleteTargetStudent.classNo}반 ${deleteTargetStudent.studentNo}번 ${deleteTargetStudent.studentName}`;
+  $("#deleteStudentConfirmName").value = "";
+  $("#deleteStudentError").textContent = "";
+  $("#deleteStudentModal").classList.remove("hidden");
+  $("#deleteStudentModal").setAttribute("aria-hidden", "false");
+  setTimeout(() => $("#deleteStudentConfirmName").focus(), 50);
+}
+
+function closeDeleteStudentModal() {
+  deleteTargetStudent = null;
+  $("#deleteStudentModal").classList.add("hidden");
+  $("#deleteStudentModal").setAttribute("aria-hidden", "true");
+  $("#deleteStudentConfirmName").value = "";
+  $("#deleteStudentError").textContent = "";
+}
+
+async function performCompleteStudentDelete() {
+  if (!isPinAdmin()) throw new Error("삭제 권한이 없습니다.");
+  if (!deleteTargetStudent) throw new Error("삭제할 학생을 찾을 수 없습니다.");
+
+  const target = deleteTargetStudent;
+  const typedName = $("#deleteStudentConfirmName").value.trim();
+  if (typedName !== target.studentName) {
+    throw new Error("학생 이름이 일치하지 않습니다.");
+  }
+
+  const [appSnap, histSnap, sessSnap] = await Promise.all([
+    getDocs(query(collection(db, "applications"), where("studentKey", "==", target.studentKey))),
+    getDocs(query(collection(db, "applicationHistory"), where("studentKey", "==", target.studentKey))),
+    getDocs(query(collection(db, "studentSessions"), where("studentKey", "==", target.studentKey)))
+  ]);
+
+  let studentRefs = [];
+  if (target.rosterId) {
+    studentRefs = [doc(db, "students", target.rosterId)];
+  } else {
+    const studentSnap = await getDocs(
+      query(collection(db, "students"), where("studentKey", "==", target.studentKey))
+    );
+    studentRefs = studentSnap.docs.map(d => d.ref);
+  }
+
+  const refs = [
+    ...appSnap.docs.map(d => d.ref),
+    ...histSnap.docs.map(d => d.ref),
+    ...sessSnap.docs.map(d => d.ref),
+    ...studentRefs
+  ];
+
+  if (target.accessId) refs.push(doc(db, "studentAccess", target.accessId));
+  if (lockMap.has(target.studentKey)) refs.push(doc(db, "studentLocks", target.studentKey));
+
+  const batch = writeBatch(db);
+  refs.forEach(ref => batch.delete(ref));
+  await batch.commit();
+}
+
+function openStudentModal(studentKey) {
+  currentStudentModalKey = studentKey;
+
+  const deleteBtn = $("#deleteStudentBtn");
+  if (deleteBtn) deleteBtn.classList.toggle("hidden", !isPinAdmin());
+
+  $("#historyPanel").classList.add("hidden");
+  $("#historyList").innerHTML = "";
+
+  const apps = getStudentApplications(studentKey);
+  if (!apps.length) return toast("해당 학생의 지원정보가 없습니다.");
+
+  const first = apps[0];
+  $("#studentModalTitle").textContent =
+    `${first.classNo}반 ${first.studentNo}번 ${first.studentName}`;
+  $("#studentModalSub").textContent = `등록된 지원정보 ${apps.length}건`;
+
+  const locked = isStudentLocked(studentKey);
+  $("#lockBtn").textContent = locked ? "잠금 해제" : "지원안 잠금";
+  $("#lockBtn").classList.toggle("danger-outline", locked);
+  $("#studentLockInfo").innerHTML = locked
+    ? `<span class="lock-badge locked">🔒 학생 수정 잠금 상태</span>`
+    : `<span class="lock-badge">🔓 학생 수정 가능</span>`;
+
+  const submittedCount =
+    apps.filter(a => (a.status || "검토중") === "원서접수완료").length;
+  const allSubmitted = submittedCount === apps.length;
+  const progressPercent =
+    apps.length ? Math.round((submittedCount / apps.length) * 100) : 0;
+
+  $("#studentProgress").innerHTML = `
+    <div class="progress-summary ${allSubmitted ? "complete" : ""}">
+      <div class="progress-summary-top">
+        <span>${allSubmitted ? "✅ 전체 접수 완료" : "원서접수 진행률"}</span>
+        <strong>${submittedCount}/${apps.length}</strong>
+      </div>
+      <div class="progress-track"><span style="width:${progressPercent}%"></span></div>
+      <small>${progressPercent}% 완료</small>
+    </div>
+  `;
+
+  $("#studentApplications").innerHTML = apps.map((a, index) => `
+    <article class="student-app-card">
+      <div class="student-app-number">${escapeHtml(a.priority || index + 1)}</div>
+      <div class="student-app-main">
+        <div class="student-app-university">${escapeHtml(a.university)}</div>
+        <div class="student-app-department">${escapeHtml(a.department)}</div>
+
+        <div class="student-app-meta">
+          <span>${escapeHtml(a.admissionType)}</span>
+          <span>${escapeHtml(a.admissionName)}</span>
+          <span class="status-pill ${statusClass(a.status)}">${escapeHtml(a.status || "검토중")}</span>
+        </div>
+
+        <div class="student-app-actions">
+          <label>교사 상태 변경
+            <select class="teacher-status-select"
+                    data-id="${escapeHtml(a.id)}"
+                    data-student-key="${escapeHtml(a.studentKey)}">
+              ${["검토중","담임확인","최종결정","원서접수완료"].map(v =>
+                `<option value="${v}" ${(a.status || "검토중") === v ? "selected" : ""}>${v}</option>`
+              ).join("")}
+            </select>
+          </label>
+
+          <label>합격결과
+            <select class="teacher-result-select"
+                    data-id="${escapeHtml(a.id)}"
+                    data-student-key="${escapeHtml(a.studentKey)}"
+                    data-old-result="${escapeHtml(a.resultStatus || "미입력")}">
+              ${["미입력","1단계 합격","면접대상","최초합격","예비","추가합격","불합격","최종등록"].map(v =>
+                `<option value="${v}" ${(a.resultStatus || "미입력") === v ? "selected" : ""}>${v}</option>`
+              ).join("")}
+            </select>
+          </label>
+
+          <label>예비번호
+            <input class="teacher-waitlist-input"
+                   data-id="${escapeHtml(a.id)}"
+                   value="${escapeHtml(a.waitlistNo || "")}"
+                   placeholder="예: 14"
+                   ${a.resultStatus === "예비" ? "" : "disabled"} />
+          </label>
+        </div>
+
+        ${a.memo ? `<div class="student-app-memo">메모 · ${escapeHtml(a.memo)}</div>` : ""}
+      </div>
+    </article>
+  `).join("");
+
+  $("#studentApplications").querySelectorAll(".teacher-status-select").forEach(select => {
+    select.addEventListener("change", async () => {
+      const oldStatus =
+        getStudentApplications(studentKey)
+          .find(x => x.id === select.dataset.id)?.status || "검토중";
+      const newStatus = select.value;
+      if (oldStatus === newStatus) return;
+
+      const ok = await changeApplicationStatus(
+        select.dataset.id,
+        select.dataset.studentKey,
+        oldStatus,
+        newStatus,
+        select
+      );
+
+      if (ok) {
+        setTimeout(() => {
+          if (currentStudentModalKey === studentKey) openStudentModal(studentKey);
+        }, 150);
+      } else {
+        select.value = oldStatus;
+      }
+    });
+  });
+
+  $("#studentApplications").querySelectorAll(".teacher-result-select").forEach(select => {
+    select.addEventListener("change", async () => {
+      const oldResult = select.dataset.oldResult || "미입력";
+      const newResult = select.value;
+      const card = select.closest(".student-app-card");
+      const waitInput = card.querySelector(".teacher-waitlist-input");
+
+      if (newResult === "예비") {
+        waitInput.disabled = false;
+        waitInput.focus();
+      } else {
+        waitInput.value = "";
+        waitInput.disabled = true;
+      }
+
+      const ok = await changeApplicationResult(
+        select.dataset.id,
+        select.dataset.studentKey,
+        oldResult,
+        newResult,
+        waitInput.value,
+        select
+      );
+
+      if (ok) {
+        select.dataset.oldResult = newResult;
+        setTimeout(() => {
+          if (currentStudentModalKey === studentKey) openStudentModal(studentKey);
+        }, 150);
+      } else {
+        select.value = oldResult;
+      }
+    });
+  });
+
+  $("#studentApplications").querySelectorAll(".teacher-waitlist-input").forEach(input => {
+    input.addEventListener("change", async () => {
+      const card = input.closest(".student-app-card");
+      const select = card.querySelector(".teacher-result-select");
+      if (select.value !== "예비") return;
+
+      await changeApplicationResult(
+        input.dataset.id,
+        select.dataset.studentKey,
+        "예비",
+        "예비",
+        input.value,
+        input
+      );
+    });
+  });
+
+  $("#studentModal").classList.remove("hidden");
+  $("#studentModal").setAttribute("aria-hidden", "false");
+}
+
+function closeStudentModal() {
+  currentStudentModalKey = null;
+  $("#historyPanel").classList.add("hidden");
+  $("#historyList").innerHTML = "";
+  $("#studentModal").classList.add("hidden");
+  $("#studentModal").setAttribute("aria-hidden", "true");
+  $("#studentApplications").innerHTML = "";
+}
+
+async function loadStudentHistory(studentKey) {
+  if (!studentKey) return;
+  const host = $("#historyList");
+  host.innerHTML = `<div class="empty">수정 이력을 불러오는 중입니다.</div>`;
+
+  try {
+    const snap = await getDocs(
+      query(collection(db, "applicationHistory"), where("studentKey", "==", studentKey))
+    );
+
+    const list = snap.docs.map(d => ({id:d.id, ...d.data()}))
+      .sort((a,b) => {
+        const at = a.changedAt?.toMillis?.() || 0;
+        const bt = b.changedAt?.toMillis?.() || 0;
+        return bt - at;
+      });
+
+    if (!list.length) {
+      host.innerHTML = `<div class="empty">아직 기록된 수정 이력이 없습니다.</div>`;
+      return;
+    }
+
+    host.innerHTML = list.map(item => {
+      const date = item.changedAt?.toDate?.();
+      const dateText = date
+        ? date.toLocaleString("ko-KR", {
+            year:"numeric", month:"2-digit", day:"2-digit",
+            hour:"2-digit", minute:"2-digit"
+          })
+        : "시간 정보 없음";
+
+      const changes = Array.isArray(item.changes) ? item.changes : [];
+
+      return `<article class="history-item">
+        <div class="history-date">${escapeHtml(dateText)}</div>
+        <div class="history-changes">
+          ${changes.length ? changes.map(c => `
+            <div class="history-change">
+              <span class="history-type ${c.type === "삭제" ? "delete" : c.type === "추가" ? "add" : "edit"}">${escapeHtml(c.type)}</span>
+              <div>
+                <strong>지원 ${escapeHtml(c.priority)}</strong>
+                <p>${escapeHtml(c.text)}</p>
+              </div>
+            </div>
+          `).join("") : `<span class="helper">변경 상세정보가 없습니다.</span>`}
+        </div>
+      </article>`;
+    }).join("");
+  } catch (e) {
+    console.error(e);
+    host.innerHTML =
+      `<div class="empty">수정 이력을 불러오지 못했습니다. Firestore 규칙을 확인해 주세요.</div>`;
+  }
+}
+
+async function changeApplicationResult(
+  applicationId, studentKey, oldResult, newResult, waitlistNo = "", controlEl = null
+) {
+  if (!applicationId || !studentKey) return false;
+  if (controlEl) controlEl.disabled = true;
+
+  try {
+    const application = rows.find(r => r.id === applicationId);
+    if (!application) throw new Error("지원정보를 찾을 수 없습니다.");
+
+    const payload = {
+      resultStatus: newResult,
+      updatedAt: serverTimestamp(),
+      waitlistNo: newResult === "예비" ? String(waitlistNo || "").trim() : ""
+    };
+
+    await updateDoc(doc(db, "applications", applicationId), payload);
+
+    await addDoc(collection(db, "applicationHistory"), {
+      studentKey,
+      classNo: application.classNo,
+      studentNo: application.studentNo,
+      studentName: application.studentName,
+      changes: [{
+        type: "수정",
+        priority: application.priority || 0,
+        text: `합격결과: ${oldResult || "미입력"} → ${newResult}${
+          newResult === "예비" && payload.waitlistNo
+            ? ` / 예비 ${payload.waitlistNo}번`
+            : ""
+        }`
+      }],
+      before: [],
+      after: [],
+      changedAt: serverTimestamp(),
+      changedByUid: auth.currentUser?.uid || "",
+      changedByTeacher: true
+    });
+
+    toast(`합격결과를 '${newResult}'로 변경했습니다.`);
+    return true;
+  } catch (e) {
+    console.error(e);
+    toast("합격결과 변경에 실패했습니다.");
+    return false;
+  } finally {
+    if (controlEl) controlEl.disabled = false;
+  }
+}
+
+async function changeApplicationStatus(
+  applicationId, studentKey, oldStatus, newStatus, selectEl = null
+) {
+  if (!applicationId || !studentKey) return false;
+  if (selectEl) selectEl.disabled = true;
+
+  try {
+    const application = rows.find(r => r.id === applicationId);
+    if (!application) throw new Error("지원정보를 찾을 수 없습니다.");
+
+    await updateDoc(doc(db, "applications", applicationId), {
+      status: newStatus,
+      updatedAt: serverTimestamp()
+    });
+
+    await addDoc(collection(db, "applicationHistory"), {
+      studentKey,
+      classNo: application.classNo,
+      studentNo: application.studentNo,
+      studentName: application.studentName,
+      changes: [{
+        type: "수정",
+        priority: application.priority || 0,
+        text: `상태: ${oldStatus} → ${newStatus}`
+      }],
+      before: [],
+      after: [],
+      changedAt: serverTimestamp(),
+      changedByUid: auth.currentUser?.uid || "",
+      changedByTeacher: true
+    });
+
+    toast(`지원상태를 '${newStatus}'로 변경했습니다.`);
+    return true;
+  } catch (e) {
+    console.error(e);
+    toast("지원상태 변경에 실패했습니다.");
+    return false;
+  } finally {
+    if (selectEl) selectEl.disabled = false;
+  }
+}
+
 function renderTable() {
   const data = filteredRows();
   $("#visibleCount").textContent = `${data.length}건 표시`;
@@ -534,6 +973,71 @@ function renderTable() {
       </td>
     </tr>`).join("") : `<tr><td colspan="8"><div class="empty">조건에 맞는 지원정보가 없습니다.</div></td></tr>`;
 
+  $("#applicationTable").querySelectorAll(".table-status-select").forEach(select => {
+    select.addEventListener("change", async () => {
+      const oldStatus = select.dataset.oldStatus || "검토중";
+      const newStatus = select.value;
+      if (oldStatus === newStatus) return;
+
+      const ok = await changeApplicationStatus(
+        select.dataset.id,
+        select.dataset.studentKey,
+        oldStatus,
+        newStatus,
+        select
+      );
+
+      if (ok) select.dataset.oldStatus = newStatus;
+      else select.value = oldStatus;
+    });
+  });
+
+  $("#applicationTable").querySelectorAll(".table-result-select").forEach(select => {
+    select.addEventListener("change", async () => {
+      const oldResult = select.dataset.oldResult || "미입력";
+      const newResult = select.value;
+      const row = select.closest("tr");
+      const waitInput = row.querySelector(".table-waitlist-input");
+
+      if (newResult === "예비") {
+        waitInput.disabled = false;
+      } else {
+        waitInput.value = "";
+        waitInput.disabled = true;
+      }
+
+      if (oldResult === newResult) return;
+
+      const ok = await changeApplicationResult(
+        select.dataset.id,
+        select.dataset.studentKey,
+        oldResult,
+        newResult,
+        waitInput.value,
+        select
+      );
+
+      if (ok) select.dataset.oldResult = newResult;
+      else select.value = oldResult;
+    });
+  });
+
+  $("#applicationTable").querySelectorAll(".table-waitlist-input").forEach(input => {
+    input.addEventListener("change", async () => {
+      const row = input.closest("tr");
+      const select = row.querySelector(".table-result-select");
+      if (select.value !== "예비") return;
+
+      await changeApplicationResult(
+        input.dataset.id,
+        select.dataset.studentKey,
+        "예비",
+        "예비",
+        input.value,
+        input
+      );
+    });
+  });
 }
 function render() {
   renderStats();
@@ -614,6 +1118,64 @@ document.querySelectorAll(".result-summary-card").forEach(btn => {
     renderTable();
     document.querySelector(".filters").scrollIntoView({behavior:"smooth", block:"center"});
   });
+});
+
+
+$("#lockBtn").addEventListener("click", async () => {
+  if (!currentStudentModalKey) return;
+  await toggleStudentLock(currentStudentModalKey);
+});
+
+$("#historyBtn").addEventListener("click", async () => {
+  if (!currentStudentModalKey) return;
+
+  const panel = $("#historyPanel");
+  const opening = panel.classList.contains("hidden");
+  panel.classList.toggle("hidden");
+
+  if (opening) {
+    await loadStudentHistory(currentStudentModalKey);
+    panel.scrollIntoView({behavior:"smooth", block:"nearest"});
+  }
+});
+
+$("#studentModalCloseBtn").addEventListener("click", closeStudentModal);
+$("#studentModal").addEventListener("click", (e) => {
+  if (e.target === $("#studentModal")) closeStudentModal();
+});
+
+$("#deleteStudentBtn").addEventListener("click", () => {
+  if (!currentStudentModalKey) return;
+  openDeleteStudentModal(currentStudentModalKey);
+});
+
+$("#deleteStudentCloseBtn").addEventListener("click", closeDeleteStudentModal);
+$("#deleteStudentCancelBtn").addEventListener("click", closeDeleteStudentModal);
+
+$("#deleteStudentModal").addEventListener("click", (e) => {
+  if (e.target === $("#deleteStudentModal")) closeDeleteStudentModal();
+});
+
+$("#deleteStudentConfirmBtn").addEventListener("click", async () => {
+  const btn = $("#deleteStudentConfirmBtn");
+  $("#deleteStudentError").textContent = "";
+  btn.disabled = true;
+  btn.textContent = "삭제 중...";
+
+  try {
+    const name = deleteTargetStudent?.studentName || "";
+    await performCompleteStudentDelete();
+    closeDeleteStudentModal();
+    closeStudentModal();
+    toast(`${name} 학생의 관련 데이터를 완전히 삭제했습니다.`);
+  } catch (e) {
+    console.error(e);
+    $("#deleteStudentError").textContent =
+      e.message || "삭제 중 오류가 발생했습니다.";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "완전 삭제";
+  }
 });
 
 // 학생 이름 클릭은 표가 다시 그려져도 항상 작동하도록 이벤트 위임 방식 사용
