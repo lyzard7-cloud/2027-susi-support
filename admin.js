@@ -207,6 +207,7 @@ function applyMyClassView() {
   $("#filterClass").value = myAssignedClass;
   renderTable();
   renderClassStatus();
+  renderAnalytics();
   toast(`${myAssignedClass}반 중심 화면으로 전환했습니다.`);
 }
 
@@ -215,6 +216,7 @@ function applyAllClassView() {
   $("#filterClass").value = "";
   renderTable();
   renderClassStatus();
+  renderAnalytics();
   toast("전체 학년 화면으로 전환했습니다.");
 }
 
@@ -1039,6 +1041,174 @@ function renderTable() {
     });
   });
 }
+
+function countBy(data, keyFn) {
+  const map = new Map();
+  data.forEach(item => {
+    const key = String(keyFn(item) || "").trim();
+    if (!key) return;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(item);
+  });
+  return [...map.entries()].sort((a,b) =>
+    b[1].length - a[1].length ||
+    a[0].localeCompare(b[0], "ko")
+  );
+}
+
+function analyticsSourceRows() {
+  const classNo = $("#filterClass").value;
+  const type = $("#filterType").value;
+  const status = $("#filterStatus").value;
+  const result = $("#filterResult").value;
+  const q = $("#searchInput").value.trim().toLowerCase();
+
+  return rows.filter(r => {
+    if (classNo && r.classNo !== classNo) return false;
+    if (type && r.admissionType !== type) return false;
+    if (status && (r.status || "검토중") !== status) return false;
+    if (result && (r.resultStatus || "미입력") !== result) return false;
+    if (q && ![
+      r.studentName,r.university,r.department,r.admissionType,
+      r.admissionName,r.status,r.resultStatus,r.waitlistNo
+    ].join(" ").toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+function analyticsBar(label, count, maxCount, type, value) {
+  const pct = maxCount ? Math.max(5, Math.round((count / maxCount) * 100)) : 0;
+  return `
+    <button type="button" class="analytics-row"
+      data-analytics-type="${type}"
+      data-analytics-value="${escapeHtml(value)}">
+      <div class="analytics-row-top">
+        <span>${escapeHtml(label)}</span>
+        <strong>${count}건</strong>
+      </div>
+      <div class="analytics-bar-track"><span style="width:${pct}%"></span></div>
+    </button>
+  `;
+}
+
+function renderAnalytics() {
+  const data = analyticsSourceRows();
+
+  const universities = countBy(data, r => r.university);
+  const departments = countBy(data, r => r.department);
+  const admissionTypes = countBy(data, r => r.admissionType);
+  const classes = countBy(data, r => r.classNo);
+
+  $("#universityStatCount").textContent = `${universities.length}개 대학`;
+  $("#departmentStatCount").textContent = `${departments.length}개 학과`;
+
+  const renderGroup = (selector, groups, type, labelFn, limit = null) => {
+    const host = $(selector);
+    const selected = limit ? groups.slice(0, limit) : groups;
+    const maxCount = selected[0]?.[1]?.length || 0;
+
+    host.innerHTML = selected.length
+      ? selected.map(([key, list]) =>
+          analyticsBar(labelFn(key), list.length, maxCount, type, key)
+        ).join("")
+      : `<div class="empty">집계할 지원정보가 없습니다.</div>`;
+  };
+
+  renderGroup("#universityStats", universities, "university", x => x, 10);
+  renderGroup("#departmentStats", departments, "department", x => x, 10);
+  renderGroup("#admissionTypeStats", admissionTypes, "admissionType", x => x);
+  renderGroup("#classApplicationStats", classes, "classNo", x => `${x}반`);
+
+  document.querySelectorAll(".analytics-row").forEach(btn => {
+    btn.addEventListener("click", () => {
+      openAnalyticsDetail(
+        btn.dataset.analyticsType,
+        btn.dataset.analyticsValue
+      );
+    });
+  });
+}
+
+function analyticsDetailRows(type, value) {
+  return analyticsSourceRows()
+    .filter(r => {
+      if (type === "university") return r.university === value;
+      if (type === "department") return r.department === value;
+      if (type === "admissionType") return r.admissionType === value;
+      if (type === "classNo") return r.classNo === value;
+      return false;
+    })
+    .sort((a,b) =>
+      Number(a.classNo)-Number(b.classNo) ||
+      Number(a.studentNo)-Number(b.studentNo) ||
+      (a.priority||99)-(b.priority||99)
+    );
+}
+
+function analyticsDetailTitle(type, value) {
+  if (type === "university") return `${value} 지원 학생`;
+  if (type === "department") return `${value} 지원 학생`;
+  if (type === "admissionType") return `${value} 지원 학생`;
+  if (type === "classNo") return `${value}반 지원 현황`;
+  return "지원 학생 목록";
+}
+
+function openAnalyticsDetail(type, value) {
+  const detailRows = analyticsDetailRows(type, value);
+
+  $("#analyticsDetailTitle").textContent = analyticsDetailTitle(type, value);
+  $("#analyticsDetailSub").textContent = `${detailRows.length}건의 지원정보`;
+
+  $("#analyticsDetailTable").innerHTML = detailRows.length
+    ? detailRows.map(r => `
+      <tr>
+        <td>${escapeHtml(r.classNo)}반 ${escapeHtml(r.studentNo)}번 ${escapeHtml(r.studentName)}</td>
+        <td>${escapeHtml(r.university)}</td>
+        <td>${escapeHtml(r.department)}</td>
+        <td>${escapeHtml(r.admissionType)}</td>
+        <td>${escapeHtml(r.admissionName)}</td>
+        <td>${escapeHtml(r.status || "검토중")}</td>
+        <td>${escapeHtml(r.resultStatus || "미입력")}${
+          r.resultStatus === "예비" && r.waitlistNo
+            ? ` (${escapeHtml(r.waitlistNo)}번)`
+            : ""
+        }</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="7"><div class="empty">해당 조건의 지원정보가 없습니다.</div></td></tr>`;
+
+  $("#analyticsDetail").classList.remove("hidden");
+  $("#analyticsDetail").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function closeAnalyticsDetail() {
+  $("#analyticsDetail").classList.add("hidden");
+}
+
+function exportAnalyticsCsv() {
+  const data = analyticsSourceRows();
+  if (!data.length) return toast("통계로 내보낼 지원정보가 없습니다.");
+
+  const universities = countBy(data, r => r.university);
+  const departments = countBy(data, r => r.department);
+  const admissionTypes = countBy(data, r => r.admissionType);
+  const classes = countBy(data, r => r.classNo);
+
+  const tableRows = [
+    ["구분","항목","지원건수"],
+    ...universities.map(([k,v]) => ["대학", k, v.length]),
+    ...departments.map(([k,v]) => ["학과", k, v.length]),
+    ...admissionTypes.map(([k,v]) => ["전형유형", k, v.length]),
+    ...classes.map(([k,v]) => ["반", `${k}반`, v.length])
+  ];
+
+  downloadCsv(
+    `수시지원_통계_${new Date().toISOString().slice(0,10)}.csv`,
+    tableRows
+  );
+  toast("수시지원 통계 CSV를 내려받았습니다.");
+}
+
 function render() {
   renderStats();
   renderStatusSummary();
@@ -1046,6 +1216,7 @@ function render() {
   renderClassStatus();
   renderDuplicates();
   renderTable();
+  renderAnalytics();
 }
 ["filterClass","filterType","filterStatus","filterResult","viewMode"].forEach(id => $("#"+id).addEventListener("change", () => {
   if (id === "filterClass") {
@@ -1054,8 +1225,12 @@ function render() {
   renderStatusSummary();
   renderResultSummary();
   renderTable();
+  renderAnalytics();
 }));
-$("#searchInput").addEventListener("input", renderTable);
+$("#searchInput").addEventListener("input", () => {
+  renderTable();
+  renderAnalytics();
+});
 $("#showMyClassBtn").addEventListener("click", applyMyClassView);
 $("#showAllClassesBtn").addEventListener("click", applyAllClassView);
 $("#teacherClassManageBtn").addEventListener("click", openTeacherClassModal);
@@ -1103,6 +1278,8 @@ $("#teacherClassSaveBtn").addEventListener("click", async () => {
 $("#filterDuplicateReview").addEventListener("change", () => {
   renderDuplicates();
 });
+$("#analyticsDetailCloseBtn").addEventListener("click", closeAnalyticsDetail);
+$("#analyticsCsvBtn").addEventListener("click", exportAnalyticsCsv);
 document.querySelectorAll(".status-summary-card").forEach(btn => {
   btn.addEventListener("click", () => {
     $("#filterStatus").value = btn.dataset.status || "";

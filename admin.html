@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>교사용 | 2027 수시지원 관리</title>
   <link rel="stylesheet" href="./style.css?v=13.2" />
+  <link rel="stylesheet" href="./stats-v14.css?v=14.0" />
 </head>
 <body>
   <header class="topbar">
@@ -147,6 +148,73 @@
       </section>
 
 
+
+
+      <section class="card analytics-card">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">학년 전체 통계</span>
+            <h2>수시 지원 통계 대시보드</h2>
+            <p>현재 입력된 지원정보를 기준으로 대학·학과·전형·반별 지원 흐름을 자동 집계합니다.</p>
+          </div>
+          <div class="analytics-actions">
+            <button id="analyticsCsvBtn" class="ghost">통계 CSV</button>
+          </div>
+        </div>
+
+        <div class="analytics-grid">
+          <div class="analytics-panel">
+            <div class="analytics-panel-head">
+              <h3>대학별 지원 TOP 10</h3>
+              <span id="universityStatCount" class="helper"></span>
+            </div>
+            <div id="universityStats" class="analytics-list"></div>
+          </div>
+
+          <div class="analytics-panel">
+            <div class="analytics-panel-head">
+              <h3>학과별 지원 TOP 10</h3>
+              <span id="departmentStatCount" class="helper"></span>
+            </div>
+            <div id="departmentStats" class="analytics-list"></div>
+          </div>
+
+          <div class="analytics-panel">
+            <div class="analytics-panel-head">
+              <h3>전형유형별</h3>
+            </div>
+            <div id="admissionTypeStats" class="analytics-list"></div>
+          </div>
+
+          <div class="analytics-panel">
+            <div class="analytics-panel-head">
+              <h3>반별 지원 건수</h3>
+            </div>
+            <div id="classApplicationStats" class="analytics-list"></div>
+          </div>
+        </div>
+
+        <div id="analyticsDetail" class="analytics-detail hidden">
+          <div class="analytics-detail-head">
+            <div>
+              <span class="eyebrow">상세 보기</span>
+              <h3 id="analyticsDetailTitle">지원 학생 목록</h3>
+              <p id="analyticsDetailSub" class="helper"></p>
+            </div>
+            <button id="analyticsDetailCloseBtn" class="ghost small-btn">닫기</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>학생</th><th>대학</th><th>학과</th><th>전형유형</th><th>전형명</th><th>상태</th><th>결과</th>
+                </tr>
+              </thead>
+              <tbody id="analyticsDetailTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
       <section class="card class-status-card">
         <div class="section-head">
@@ -393,6 +461,6 @@
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./admin.js?v=13.4"></script>
+  <script type="module" src="./admin.js?v=14.0"></script>
 </body>
 </html>
