@@ -247,7 +247,30 @@ $("#masterUploadBtn").addEventListener("click", async () => {
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, {type:"array"});
-    const ws = wb.Sheets[wb.SheetNames[0]];
+
+    // '업로드용' 시트가 있으면 우선 사용.
+    // 없으면 각 시트를 순서대로 확인하여 대학명 열이 있는 시트를 자동 탐색.
+    let ws = wb.Sheets["업로드용"] || null;
+
+    if (!ws) {
+      for (const sheetName of wb.SheetNames) {
+        const candidate = wb.Sheets[sheetName];
+        const preview = XLSX.utils.sheet_to_json(candidate, {defval:""});
+        const first = preview[0] || {};
+        const hasUniversityColumn = Object.keys(first).some(k =>
+          ["대학명","대학교","대학","학교명","university"].includes(normalize(k))
+        );
+        if (hasUniversityColumn) {
+          ws = candidate;
+          break;
+        }
+      }
+    }
+
+    if (!ws) {
+      throw new Error("'업로드용' 시트 또는 '대학명' 열이 있는 시트를 찾지 못했습니다.");
+    }
+
     const raw = XLSX.utils.sheet_to_json(ws, {defval:""});
     const parsed = parseMasterSheet(raw);
 
