@@ -1825,7 +1825,10 @@ function setApplicationListOpen(open) {
   if (!content || !button) return;
   content.classList.toggle("hidden", !open);
   button.setAttribute("aria-expanded", open ? "true" : "false");
-  button.textContent = open ? "전체 지원 목록 접기" : "전체 지원 목록 보기";
+  const text = button.querySelector(".application-toggle-text");
+  if (text) {
+    text.textContent = open ? "전체 지원 목록 접기" : "전체 지원 목록 보기";
+  }
 }
 
 $("#toggleApplicationListBtn")?.addEventListener("click", () => {
