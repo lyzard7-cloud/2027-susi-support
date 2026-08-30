@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>상담카드 PDF 가져오기 | 강일여고 지원 현황 대시보드</title>
+  <link rel="stylesheet" href="./style.css?v=13.2" />
+  <link rel="stylesheet" href="./pdf-import-v18.css?v=18.0" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">S</span>
+      <div>
+        <div class="brand-title">강일여고 지원 현황 대시보드</div>
+        <div class="brand-subtitle">수시상담카드 PDF 가져오기</div>
+      </div>
+    </div>
+    <a class="link-button" href="./admin.html">관리자 대시보드</a>
+  </header>
+
+  <main class="container pdf-import-page">
+    <section id="authWait" class="card">
+      <h2>교사 로그인 확인 중</h2>
+      <p class="helper">관리자 로그인 상태를 확인하고 있습니다.</p>
+    </section>
+
+    <section id="importApp" class="hidden">
+      <div class="pdf-heading">
+        <div>
+          <span class="eyebrow">학생·학급 관리</span>
+          <h1>수시상담카드 PDF 가져오기</h1>
+          <p>상담카드 PDF에서 학번·이름과 지원 대학 정보를 읽은 뒤, 저장 전에 반드시 내용을 확인합니다.</p>
+        </div>
+      </div>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h2>1. 상담카드 PDF 선택</h2>
+            <p>웹 프로그램에서 출력한 텍스트형 PDF에 최적화되어 있습니다. 한 번에 한 학생의 상담카드를 처리합니다.</p>
+          </div>
+        </div>
+        <div class="pdf-upload-row">
+          <input id="pdfFile" type="file" accept="application/pdf,.pdf" />
+          <button id="analyzePdfBtn" class="primary" type="button">PDF 분석</button>
+        </div>
+        <div id="analyzeStatus" class="helper"></div>
+      </section>
+
+      <section id="studentMatchCard" class="card hidden">
+        <div class="section-head">
+          <div>
+            <h2>2. 학생 확인</h2>
+            <p>PDF에서 읽은 학생과 현재 3학년 명단을 대조합니다.</p>
+          </div>
+          <span id="studentMatchBadge" class="match-badge">확인 필요</span>
+        </div>
+
+        <div class="student-detected-grid">
+          <div><span>PDF 학번</span><strong id="detectedStudentNo">-</strong></div>
+          <div><span>PDF 이름</span><strong id="detectedStudentName">-</strong></div>
+          <div><span>추출 지원건수</span><strong id="detectedApplicationCount">0건</strong></div>
+        </div>
+
+        <label class="student-select-label">등록할 학생
+          <select id="matchedStudentSelect"></select>
+        </label>
+        <p id="studentMatchMessage" class="helper"></p>
+      </section>
+
+      <section id="previewCard" class="card hidden">
+        <div class="section-head">
+          <div>
+            <h2>3. 추출 결과 확인</h2>
+            <p>잘못 읽힌 내용이 있으면 표에서 직접 고친 뒤 등록하세요. 이미 같은 지원이 있으면 자동으로 제외합니다.</p>
+          </div>
+          <div class="preview-actions">
+            <button id="selectNewOnlyBtn" class="ghost small-btn" type="button">신규만 선택</button>
+          </div>
+        </div>
+
+        <div class="pdf-preview-note">
+          대학명은 현재 등록된 입시 마스터 데이터와 일치하면 표준 대학명으로 자동 변환됩니다.
+        </div>
+
+        <div class="table-wrap">
+          <table class="pdf-preview-table">
+            <thead>
+              <tr>
+                <th>등록</th>
+                <th>순번</th>
+                <th>대학</th>
+                <th>학과</th>
+                <th>전형유형</th>
+                <th>전형명</th>
+                <th>판정</th>
+              </tr>
+            </thead>
+            <tbody id="pdfPreviewBody"></tbody>
+          </table>
+        </div>
+
+        <div class="import-bottom-bar">
+          <div id="importSummary">등록할 지원을 선택하세요.</div>
+          <button id="importApplicationsBtn" class="primary" type="button">선택한 지원 일괄 등록</button>
+        </div>
+      </section>
+
+      <section id="resultCard" class="card hidden">
+        <h2>등록 완료</h2>
+        <p id="importResultText"></p>
+        <div class="result-actions">
+          <a class="primary link-button" href="./admin.html">대시보드에서 확인</a>
+          <button id="importAnotherBtn" class="ghost" type="button">다른 PDF 가져오기</button>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script type="module" src="./pdf-import.js?v=18.0"></script>
+</body>
+</html>
