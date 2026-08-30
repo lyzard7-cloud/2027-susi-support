@@ -8,6 +8,21 @@
   <link rel="stylesheet" href="./stats-v14.css?v=14.0" />
   <link rel="stylesheet" href="./deadlines-v15.css?v=15.0" />
   <link rel="stylesheet" href="./dashboard-v17.css?v=17.0" />
+
+  <style>
+    .dashboard-main-title {
+      font-size: clamp(1.45rem, 2.6vw, 2rem);
+      line-height: 1.2;
+      white-space: nowrap;
+      letter-spacing: -0.04em;
+    }
+    @media (max-width: 520px) {
+      .dashboard-main-title {
+        font-size: 1.25rem;
+        letter-spacing: -0.055em;
+      }
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -25,8 +40,7 @@
     <section id="loginPanel" class="login-wrap">
       <div class="card login-card">
         <span class="eyebrow">담임교사 전용</span>
-        <h1>강일여고 지원 현황 대시보드</h1>
-        <p>Firebase Authentication에 등록한 교사 계정으로 로그인합니다.</p>
+        <h1 class="dashboard-main-title">강일여고 지원 현황 대시보드</h1>
         <label>이메일
           <input id="email" type="email" placeholder="teacher@school.kr" />
         </label>
@@ -42,7 +56,7 @@
       <div class="dashboard-heading">
         <div>
           <span class="eyebrow">3학년 담임교사용</span>
-          <h1>지원 현황 대시보드</h1>
+          <h1 class="dashboard-main-title">강일여고 지원 현황 대시보드</h1>
           <p id="syncText">데이터를 불러오는 중입니다.</p>
         </div>
         <div class="heading-actions">
