@@ -106,6 +106,89 @@
       background: #f7faff;
     }
   </style>
+
+  <style>
+    .pdf-delete-button {
+      border: 1px solid #d7a74e;
+      background: #fff9ed;
+      color: #815b12;
+      border-radius: 9px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .pdf-delete-button:hover {
+      background: #fff3d8;
+      border-color: #c9912f;
+    }
+    .pdf-source-badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 4px 7px;
+      margin-left: 6px;
+      background: #eef5ff;
+      color: #45699e;
+      font-size: 9px;
+      font-weight: 800;
+      vertical-align: middle;
+    }
+    .pdf-import-delete-one {
+      border: 1px solid #e0bd79;
+      background: #fffaf0;
+      color: #865f18;
+      border-radius: 8px;
+      padding: 5px 8px;
+      font-size: 9px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .pdf-import-delete-one:hover { background:#fff2d7; }
+
+    .pdf-delete-modal { width:min(680px, 100%); }
+    .pdf-delete-safe-box {
+      border:1px solid #ead29e;
+      background:#fffaf0;
+      border-radius:12px;
+      padding:12px 14px;
+      color:#5f4a1e;
+    }
+    .pdf-delete-safe-box p { margin:6px 0 8px; font-size:12px; }
+    .pdf-delete-safe-box ul { margin:0; padding-left:20px; font-size:11px; line-height:1.7; }
+    .pdf-delete-preview {
+      max-height:230px;
+      overflow:auto;
+      margin-top:12px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .pdf-delete-preview-item {
+      display:grid;
+      grid-template-columns:auto 1fr;
+      gap:8px;
+      align-items:center;
+      border:1px solid #e2e7ee;
+      border-radius:9px;
+      padding:8px 10px;
+      background:#fbfcfe;
+      font-size:11px;
+    }
+    .pdf-delete-preview-item .num {
+      width:24px;height:24px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      background:#eef2f7;color:#566274;font-weight:800;
+    }
+    .pdf-delete-confirm {
+      border:1px solid #c98e2e;
+      background:#b87816;
+      color:#fff;
+      border-radius:9px;
+      padding:9px 13px;
+      font-weight:800;
+      cursor:pointer;
+    }
+    .pdf-delete-confirm:disabled { opacity:.5; cursor:default; }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -596,8 +679,8 @@
       <div class="modal-head">
         <div>
           <span class="eyebrow danger-eyebrow">최고관리자 전용</span>
-          <h2 id="deleteStudentModalTitle">학생 데이터 완전 삭제</h2>
-          <p class="helper">이 작업은 되돌릴 수 없습니다.</p>
+          <h2 id="deleteStudentModalTitle">학생 전체 데이터 완전 삭제</h2>
+          <p class="helper">학생 명단과 PIN까지 삭제되는 최고관리자용 기능입니다. 이 작업은 되돌릴 수 없습니다.</p>
         </div>
         <button id="deleteStudentCloseBtn" class="ghost small-btn" type="button">닫기</button>
       </div>
@@ -621,7 +704,39 @@
 
       <div class="modal-actions">
         <button id="deleteStudentCancelBtn" class="ghost" type="button">취소</button>
-        <button id="deleteStudentConfirmBtn" class="danger-button" type="button">완전 삭제</button>
+        <button id="deleteStudentConfirmBtn" class="danger-button" type="button">학생 전체 데이터 완전 삭제</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="deletePdfImportsModal" class="modal-backdrop hidden" aria-hidden="true">
+    <div class="modal-card pdf-delete-modal" role="dialog" aria-modal="true" aria-labelledby="deletePdfImportsModalTitle">
+      <div class="modal-head">
+        <div>
+          <span class="eyebrow">상담카드 PDF 정리</span>
+          <h2 id="deletePdfImportsModalTitle">PDF에서 가져온 지원정보만 삭제</h2>
+          <p class="helper">학생 명단과 PIN, 직접 입력한 지원정보는 그대로 유지됩니다.</p>
+        </div>
+        <button id="deletePdfImportsCloseBtn" class="ghost small-btn" type="button">닫기</button>
+      </div>
+
+      <div class="pdf-delete-safe-box">
+        <strong id="deletePdfImportsStudentLabel">학생</strong>
+        <p><span id="deletePdfImportsCount">0</span>건의 PDF 가져오기 지원정보를 삭제합니다.</p>
+        <ul>
+          <li>학생 이름·학번·반 정보는 유지</li>
+          <li>학생 PIN 및 인증정보는 유지</li>
+          <li>직접 입력한 지원정보는 유지</li>
+          <li>PDF에서 가져온 지원 항목만 삭제</li>
+        </ul>
+      </div>
+
+      <div id="deletePdfImportsList" class="pdf-delete-preview"></div>
+
+      <div class="modal-actions">
+        <button id="deletePdfImportsCancelBtn" class="ghost" type="button">취소</button>
+        <button id="deletePdfImportsConfirmBtn" class="pdf-delete-confirm" type="button">PDF 지원정보만 삭제</button>
       </div>
     </div>
   </div>
@@ -637,7 +752,8 @@
           <div id="studentLockInfo" class="student-lock-info"></div>
         </div>
         <div class="modal-head-actions">
-          <button id="deleteStudentBtn" class="danger-button small-btn hidden" type="button">학생 데이터 삭제</button>
+          <button id="deletePdfImportsBtn" class="pdf-delete-button small-btn hidden" type="button">PDF 가져온 지원정보 삭제</button>
+          <button id="deleteStudentBtn" class="danger-button small-btn hidden" type="button">학생 전체 데이터 완전 삭제</button>
           <button id="lockBtn" class="secondary small-btn" type="button">지원안 잠금</button>
           <button id="historyBtn" class="secondary small-btn" type="button">수정 이력</button>
           <button id="studentModalCloseBtn" class="ghost small-btn" type="button">닫기</button>
@@ -691,6 +807,6 @@
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./admin.js?v=18.3"></script>
+  <script type="module" src="./admin.js?v=18.4"></script>
 </body>
 </html>

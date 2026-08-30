@@ -47,6 +47,7 @@ let unsubscribeTeacherClasses = null;
 let myAssignedClass = "";
 let showingMyClassOnly = false;
 let deleteTargetStudent = null;
+let deletePdfTargetStudentKey = null;
 let deadlineRows = [];
 let unsubscribeDeadlines = null;
 let activeRiskFilter = "";
@@ -617,11 +618,119 @@ async function performCompleteStudentDelete() {
   await batch.commit();
 }
 
+
+function getPdfImportedApplications(studentKey) {
+  return getStudentApplications(studentKey)
+    .filter(app => app.importedFrom === "counseling-card-pdf");
+}
+
+function openDeletePdfImportsModal(studentKey) {
+  const apps = getPdfImportedApplications(studentKey);
+  if (!apps.length) return toast("이 학생에게 PDF에서 가져온 지원정보가 없습니다.");
+
+  const rosterStudent = findRosterStudent(studentKey);
+  const first = apps[0] || rosterStudent;
+  deletePdfTargetStudentKey = studentKey;
+
+  $("#deletePdfImportsStudentLabel").textContent =
+    `${first?.classNo || ""}반 ${first?.studentNo || ""}번 ${first?.studentName || ""}`;
+  $("#deletePdfImportsCount").textContent = String(apps.length);
+
+  $("#deletePdfImportsList").innerHTML = apps.map((app, idx) => `
+    <div class="pdf-delete-preview-item">
+      <span class="num">${escapeHtml(app.priority || idx + 1)}</span>
+      <span>
+        ${escapeHtml(app.university)} · ${escapeHtml(app.department)}
+        · ${escapeHtml(app.admissionType)} · ${escapeHtml(app.admissionName)}
+      </span>
+    </div>
+  `).join("");
+
+  $("#deletePdfImportsModal").classList.remove("hidden");
+  $("#deletePdfImportsModal").setAttribute("aria-hidden", "false");
+}
+
+function closeDeletePdfImportsModal() {
+  deletePdfTargetStudentKey = null;
+  $("#deletePdfImportsModal").classList.add("hidden");
+  $("#deletePdfImportsModal").setAttribute("aria-hidden", "true");
+  $("#deletePdfImportsList").innerHTML = "";
+}
+
+async function deleteSinglePdfImportedApplication(applicationId, studentKey) {
+  const app = rows.find(r => r.id === applicationId);
+  if (!app || app.studentKey !== studentKey) {
+    throw new Error("삭제할 지원정보를 찾을 수 없습니다.");
+  }
+  if (app.importedFrom !== "counseling-card-pdf") {
+    throw new Error("PDF에서 가져온 지원정보만 이 기능으로 삭제할 수 있습니다.");
+  }
+
+  await deleteDoc(doc(db, "applications", applicationId));
+
+  await addDoc(collection(db, "applicationHistory"), {
+    studentKey,
+    classNo: app.classNo,
+    studentNo: app.studentNo,
+    studentName: app.studentName,
+    changes: [{
+      type: "삭제",
+      priority: app.priority || 0,
+      text: `PDF 가져오기 지원정보 삭제: ${app.university} / ${app.department} / ${app.admissionName}`
+    }],
+    before: [],
+    after: [],
+    changedAt: serverTimestamp(),
+    changedByUid: auth.currentUser?.uid || "",
+    changedByTeacher: true
+  });
+}
+
+async function deleteAllPdfImportedApplications(studentKey) {
+  const apps = getPdfImportedApplications(studentKey);
+  if (!apps.length) return 0;
+
+  // PDF에서 가져온 application 문서만 삭제한다.
+  // students / studentAccess / studentSessions / studentLocks는 절대 건드리지 않는다.
+  const batch = writeBatch(db);
+  apps.forEach(app => batch.delete(doc(db, "applications", app.id)));
+  await batch.commit();
+
+  const first = apps[0];
+  await addDoc(collection(db, "applicationHistory"), {
+    studentKey,
+    classNo: first.classNo,
+    studentNo: first.studentNo,
+    studentName: first.studentName,
+    changes: [{
+      type: "삭제",
+      priority: 0,
+      text: `수시상담카드 PDF에서 가져온 지원정보 ${apps.length}건 일괄 삭제`
+    }],
+    before: [],
+    after: [],
+    changedAt: serverTimestamp(),
+    changedByUid: auth.currentUser?.uid || "",
+    changedByTeacher: true
+  });
+
+  return apps.length;
+}
+
 function openStudentModal(studentKey) {
   currentStudentModalKey = studentKey;
 
   const deleteBtn = $("#deleteStudentBtn");
   if (deleteBtn) deleteBtn.classList.toggle("hidden", !isPinAdmin());
+
+  const pdfDeleteBtn = $("#deletePdfImportsBtn");
+  const pdfImportedApps = getPdfImportedApplications(studentKey);
+  if (pdfDeleteBtn) {
+    pdfDeleteBtn.classList.toggle("hidden", pdfImportedApps.length === 0);
+    pdfDeleteBtn.textContent = pdfImportedApps.length
+      ? `PDF 가져온 지원정보 삭제 (${pdfImportedApps.length}건)`
+      : "PDF 가져온 지원정보 삭제";
+  }
 
   $("#historyPanel").classList.add("hidden");
   $("#historyList").innerHTML = "";
@@ -662,7 +771,10 @@ function openStudentModal(studentKey) {
     <article class="student-app-card">
       <div class="student-app-number">${escapeHtml(a.priority || index + 1)}</div>
       <div class="student-app-main">
-        <div class="student-app-university">${escapeHtml(a.university)}</div>
+        <div class="student-app-university">
+          ${escapeHtml(a.university)}
+          ${a.importedFrom === "counseling-card-pdf" ? `<span class="pdf-source-badge">PDF 가져옴</span>` : ""}
+        </div>
         <div class="student-app-department">${escapeHtml(a.department)}</div>
 
         <div class="student-app-meta">
@@ -703,6 +815,16 @@ function openStudentModal(studentKey) {
         </div>
 
         ${a.memo ? `<div class="student-app-memo">메모 · ${escapeHtml(a.memo)}</div>` : ""}
+        ${a.importedFrom === "counseling-card-pdf" ? `
+          <div class="student-app-pdf-actions">
+            <button type="button"
+                    class="pdf-import-delete-one"
+                    data-id="${escapeHtml(a.id)}"
+                    data-student-key="${escapeHtml(a.studentKey)}">
+              이 PDF 지원항목만 삭제
+            </button>
+          </div>
+        ` : ""}
       </div>
     </article>
   `).join("");
@@ -782,6 +904,40 @@ function openStudentModal(studentKey) {
         input.value,
         input
       );
+    });
+  });
+
+
+  $("#studentApplications").querySelectorAll(".pdf-import-delete-one").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const app = rows.find(r => r.id === btn.dataset.id);
+      if (!app) return toast("지원정보를 찾을 수 없습니다.");
+
+      const ok = confirm(
+        `${app.university} / ${app.department} / ${app.admissionName}\n\n` +
+        `이 PDF 지원항목 1건만 삭제합니다.\n` +
+        `학생 이름·학번·PIN과 다른 지원정보는 그대로 유지됩니다.`
+      );
+      if (!ok) return;
+
+      btn.disabled = true;
+      try {
+        await deleteSinglePdfImportedApplication(btn.dataset.id, btn.dataset.studentKey);
+        toast("PDF 지원항목 1건만 삭제했습니다.");
+        setTimeout(() => {
+          if (currentStudentModalKey === studentKey) {
+            const remaining = getStudentApplications(studentKey)
+              .filter(x => x.id !== btn.dataset.id);
+            if (remaining.length) openStudentModal(studentKey);
+            else closeStudentModal();
+          }
+        }, 120);
+      } catch (e) {
+        console.error(e);
+        toast(e.message || "PDF 지원항목 삭제에 실패했습니다.");
+      } finally {
+        btn.disabled = false;
+      }
     });
   });
 
@@ -1669,6 +1825,59 @@ $("#studentModal").addEventListener("click", (e) => {
   if (e.target === $("#studentModal")) closeStudentModal();
 });
 
+
+$("#deletePdfImportsBtn").addEventListener("click", () => {
+  if (!currentStudentModalKey) return;
+  openDeletePdfImportsModal(currentStudentModalKey);
+});
+
+$("#deletePdfImportsCloseBtn").addEventListener("click", closeDeletePdfImportsModal);
+$("#deletePdfImportsCancelBtn").addEventListener("click", closeDeletePdfImportsModal);
+$("#deletePdfImportsModal").addEventListener("click", (e) => {
+  if (e.target === $("#deletePdfImportsModal")) closeDeletePdfImportsModal();
+});
+
+$("#deletePdfImportsConfirmBtn").addEventListener("click", async () => {
+  if (!deletePdfTargetStudentKey) return;
+
+  const studentKey = deletePdfTargetStudentKey;
+  const apps = getPdfImportedApplications(studentKey);
+  if (!apps.length) {
+    closeDeletePdfImportsModal();
+    return toast("삭제할 PDF 지원정보가 없습니다.");
+  }
+
+  const btn = $("#deletePdfImportsConfirmBtn");
+  btn.disabled = true;
+  btn.textContent = "삭제 중...";
+
+  try {
+    const count = await deleteAllPdfImportedApplications(studentKey);
+    closeDeletePdfImportsModal();
+
+    // 학생 명단은 유지. 지원정보가 다른 방식으로 남아 있으면 모달 갱신,
+    // PDF 지원정보뿐이었다면 지원창만 닫고 학생은 명단에 그대로 남는다.
+    const remaining = getStudentApplications(studentKey)
+      .filter(app => app.importedFrom !== "counseling-card-pdf");
+
+    if (remaining.length) {
+      setTimeout(() => {
+        if (currentStudentModalKey === studentKey) openStudentModal(studentKey);
+      }, 120);
+    } else {
+      closeStudentModal();
+    }
+
+    toast(`PDF에서 가져온 지원정보 ${count}건만 삭제했습니다. 학생 명단과 PIN은 유지됩니다.`);
+  } catch (e) {
+    console.error(e);
+    toast(e.message || "PDF 지원정보 삭제에 실패했습니다.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "PDF 지원정보만 삭제";
+  }
+});
+
 $("#deleteStudentBtn").addEventListener("click", () => {
   if (!currentStudentModalKey) return;
   openDeleteStudentModal(currentStudentModalKey);
@@ -1692,14 +1901,14 @@ $("#deleteStudentConfirmBtn").addEventListener("click", async () => {
     await performCompleteStudentDelete();
     closeDeleteStudentModal();
     closeStudentModal();
-    toast(`${name} 학생의 관련 데이터를 완전히 삭제했습니다.`);
+    toast(`${name} 학생의 명단·PIN·지원정보를 포함한 전체 데이터를 완전히 삭제했습니다.`);
   } catch (e) {
     console.error(e);
     $("#deleteStudentError").textContent =
       e.message || "삭제 중 오류가 발생했습니다.";
   } finally {
     btn.disabled = false;
-    btn.textContent = "완전 삭제";
+    btn.textContent = "학생 전체 데이터 완전 삭제";
   }
 });
 
@@ -1888,6 +2097,7 @@ document.addEventListener("keydown", (e) => {
     if (!$("#studentModal").classList.contains("hidden")) closeStudentModal();
     if (!$("#teacherClassModal").classList.contains("hidden")) closeTeacherClassModal();
     if (!$("#deleteStudentModal").classList.contains("hidden")) closeDeleteStudentModal();
+    if (!$("#deletePdfImportsModal").classList.contains("hidden")) closeDeletePdfImportsModal();
     if (!$("#deadlineModal").classList.contains("hidden")) closeDeadlineModal();
   }
 });
