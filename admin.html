@@ -189,6 +189,44 @@
     }
     .pdf-delete-confirm:disabled { opacity:.5; cursor:default; }
   </style>
+
+  <style>
+    .single-student-modal { width:min(560px, 100%); }
+    .single-student-form {
+      display:grid;
+      grid-template-columns:120px 140px 1fr;
+      gap:10px;
+      align-items:end;
+    }
+    .single-student-form label {
+      font-size:11px;
+      color:#5f6c7f;
+    }
+    .single-student-form input,
+    .single-student-form select {
+      width:100%;
+      margin-top:5px;
+    }
+    .single-student-note {
+      margin-top:12px;
+      padding:10px 12px;
+      border:1px solid #d7e3f4;
+      background:#f7faff;
+      border-radius:10px;
+      color:#596a83;
+      font-size:11px;
+      line-height:1.55;
+    }
+    .single-student-note span {
+      display:block;
+      font-weight:800;
+      color:#3d5f91;
+      margin-bottom:2px;
+    }
+    @media(max-width:650px){
+      .single-student-form{grid-template-columns:1fr;}
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -258,6 +296,7 @@
           </div>
           <div class="roster-actions">
             <a class="secondary pdf-import-link" href="./pdf-import.html">상담카드 PDF 가져오기</a>
+            <button id="addSingleStudentBtn" class="secondary hidden" type="button">학생 1명 추가</button>
             <input id="rosterFile" type="file" accept=".xlsx,.xls,.csv" class="file-input" />
             <button id="uploadRosterBtn" class="secondary">학생 명단 업로드</button>
             <button id="generatePinsBtn" class="secondary">PIN 일괄 생성/재발급</button>
@@ -710,7 +749,56 @@
   </div>
 
 
-  <div id="deletePdfImportsModal" class="modal-backdrop hidden" aria-hidden="true">
+  
+  <div id="addSingleStudentModal" class="modal-backdrop hidden" aria-hidden="true">
+    <div class="modal-card single-student-modal" role="dialog" aria-modal="true" aria-labelledby="addSingleStudentModalTitle">
+      <div class="modal-head">
+        <div>
+          <span class="eyebrow">최고관리자 전용</span>
+          <h2 id="addSingleStudentModalTitle">학생 1명 추가</h2>
+          <p class="helper">현재 전체 학생 명단은 그대로 두고, 입력한 학생 1명만 추가합니다.</p>
+        </div>
+        <button id="addSingleStudentCloseBtn" class="ghost small-btn" type="button">닫기</button>
+      </div>
+
+      <div class="single-student-form">
+        <label>반
+          <select id="singleStudentClass">
+            <option value="">선택</option>
+            <option value="1">1반</option>
+            <option value="2">2반</option>
+            <option value="3">3반</option>
+            <option value="4">4반</option>
+            <option value="5">5반</option>
+            <option value="6">6반</option>
+            <option value="7">7반</option>
+            <option value="8">8반</option>
+            <option value="9">9반</option>
+          </select>
+        </label>
+
+        <label>번호
+          <input id="singleStudentNo" type="number" min="1" max="99" placeholder="예: 12" />
+        </label>
+
+        <label>이름
+          <input id="singleStudentName" type="text" maxlength="20" placeholder="예: 신송화" />
+        </label>
+      </div>
+
+      <div class="single-student-note">
+        <span>안전하게 추가됩니다.</span>
+        기존 학생명단, 다른 학생의 PIN, 지원정보는 변경하지 않습니다.
+      </div>
+
+      <div class="modal-actions">
+        <button id="addSingleStudentCancelBtn" class="ghost" type="button">취소</button>
+        <button id="addSingleStudentConfirmBtn" class="primary" type="button">학생 1명 추가</button>
+      </div>
+    </div>
+  </div>
+
+<div id="deletePdfImportsModal" class="modal-backdrop hidden" aria-hidden="true">
     <div class="modal-card pdf-delete-modal" role="dialog" aria-modal="true" aria-labelledby="deletePdfImportsModalTitle">
       <div class="modal-head">
         <div>
@@ -807,6 +895,6 @@
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./admin.js?v=18.4"></script>
+  <script type="module" src="./admin.js?v=18.5"></script>
 </body>
 </html>

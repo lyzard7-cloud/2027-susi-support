@@ -21,11 +21,13 @@ function updatePinAdminUI(user = auth.currentUser) {
   const genBtn = document.querySelector("#generatePinsBtn");
   const exportBtn = document.querySelector("#exportPinsBtn");
   const masterBtn = document.querySelector("#masterDataBtn");
+  const singleStudentBtn = document.querySelector("#addSingleStudentBtn");
   const note = document.querySelector("#pinAdminOnlyNote");
 
   if (genBtn) genBtn.classList.toggle("hidden", !allowed);
   if (exportBtn) exportBtn.classList.toggle("hidden", !allowed);
   if (masterBtn) masterBtn.classList.toggle("hidden", !allowed);
+  if (singleStudentBtn) singleStudentBtn.classList.toggle("hidden", !allowed);
   if (note) {
     note.classList.toggle("hidden", allowed);
     if (!allowed) note.textContent = "PIN 생성·재발급 및 PIN 목록 다운로드는 최고관리자만 사용할 수 있습니다.";
@@ -1933,6 +1935,101 @@ $("#generatePinsBtn").addEventListener("click", async () => {
   } catch(e){console.error(e);toast(e.message||"PIN 생성 중 오류가 발생했습니다.");} finally{$("#generatePinsBtn").disabled=false;}
 });
 
+
+function openAddSingleStudentModal() {
+  if (!isPinAdmin()) return toast("최고관리자만 학생을 추가할 수 있습니다.");
+  $("#singleStudentClass").value = "";
+  $("#singleStudentNo").value = "";
+  $("#singleStudentName").value = "";
+  $("#addSingleStudentModal").classList.remove("hidden");
+  $("#addSingleStudentModal").setAttribute("aria-hidden", "false");
+  setTimeout(() => $("#singleStudentClass").focus(), 50);
+}
+
+function closeAddSingleStudentModal() {
+  $("#addSingleStudentModal").classList.add("hidden");
+  $("#addSingleStudentModal").setAttribute("aria-hidden", "true");
+}
+
+async function addSingleStudent() {
+  if (!isPinAdmin()) return toast("최고관리자만 학생을 추가할 수 있습니다.");
+
+  const classNo = String($("#singleStudentClass").value || "").trim();
+  const studentNo = String(Number($("#singleStudentNo").value || 0));
+  const studentName = String($("#singleStudentName").value || "").trim();
+
+  if (!classNo) return toast("반을 선택해 주세요.");
+  if (!studentNo || studentNo === "0") return toast("번호를 입력해 주세요.");
+  if (!studentName) return toast("학생 이름을 입력해 주세요.");
+
+  const normalizedName = normalize(studentName);
+  const studentKey = `${classNo}-${String(studentNo).padStart(2,"0")}-${normalizedName}`;
+
+  const sameSeat = roster.find(st =>
+    String(st.classNo) === classNo &&
+    Number(st.studentNo) === Number(studentNo)
+  );
+  if (sameSeat) {
+    return toast(`${classNo}반 ${studentNo}번에는 이미 ${sameSeat.studentName} 학생이 있습니다.`);
+  }
+
+  const sameKey = roster.find(st => st.studentKey === studentKey);
+  if (sameKey) {
+    return toast("동일한 학생이 이미 명단에 등록되어 있습니다.");
+  }
+
+  const sameName = roster.filter(st => normalize(st.studentName) === normalizedName);
+  if (sameName.length) {
+    const ok = confirm(
+      `현재 학생명단에 같은 이름의 학생이 ${sameName.length}명 있습니다.\n\n` +
+      sameName.map(st => `${st.classNo}반 ${st.studentNo}번 ${st.studentName}`).join("\n") +
+      `\n\n그래도 ${classNo}반 ${studentNo}번 ${studentName} 학생을 추가하시겠습니까?`
+    );
+    if (!ok) return;
+  }
+
+  const btn = $("#addSingleStudentConfirmBtn");
+  btn.disabled = true;
+  btn.textContent = "추가 중...";
+
+  try {
+    const ref = doc(collection(db, "students"));
+    await setDoc(ref, {
+      classNo,
+      studentNo,
+      studentName,
+      studentKey,
+      pin: "",
+      accessId: "",
+      createdAt: serverTimestamp(),
+      addedIndividually: true,
+      addedByUid: auth.currentUser?.uid || "",
+      addedByEmail: auth.currentUser?.email || ""
+    });
+
+    closeAddSingleStudentModal();
+    toast(`${classNo}반 ${studentNo}번 ${studentName} 학생을 추가했습니다. 필요하면 PIN을 발급해 주세요.`);
+  } catch (e) {
+    console.error(e);
+    toast(e.message || "학생 추가에 실패했습니다.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "학생 1명 추가";
+  }
+}
+
+$("#addSingleStudentBtn").addEventListener("click", openAddSingleStudentModal);
+$("#addSingleStudentCloseBtn").addEventListener("click", closeAddSingleStudentModal);
+$("#addSingleStudentCancelBtn").addEventListener("click", closeAddSingleStudentModal);
+$("#addSingleStudentModal").addEventListener("click", (e) => {
+  if (e.target === $("#addSingleStudentModal")) closeAddSingleStudentModal();
+});
+$("#addSingleStudentConfirmBtn").addEventListener("click", addSingleStudent);
+
+$("#singleStudentName").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") addSingleStudent();
+});
+
 $("#exportPinsBtn").addEventListener("click",()=>{
   if(!roster.length)return toast("학생 명단이 없습니다.");const missing=roster.filter(r=>!r.pin);if(missing.length)return toast(`PIN이 없는 학생이 ${missing.length}명 있습니다. PIN 일괄 생성을 먼저 실행하세요.`);
   const data=[...roster].sort((a,b)=>Number(a.classNo)-Number(b.classNo)||Number(a.studentNo)-Number(b.studentNo));const rowsCsv=[["반","번호","이름","PIN"],...data.map(r=>[r.classNo,r.studentNo,r.studentName,r.pin])];const csv="\ufeff"+rowsCsv.map(row=>row.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`학생_PIN_목록_${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);toast("학생 PIN 목록을 내려받았습니다.");
@@ -2098,6 +2195,7 @@ document.addEventListener("keydown", (e) => {
     if (!$("#teacherClassModal").classList.contains("hidden")) closeTeacherClassModal();
     if (!$("#deleteStudentModal").classList.contains("hidden")) closeDeleteStudentModal();
     if (!$("#deletePdfImportsModal").classList.contains("hidden")) closeDeletePdfImportsModal();
+    if (!$("#addSingleStudentModal").classList.contains("hidden")) closeAddSingleStudentModal();
     if (!$("#deadlineModal").classList.contains("hidden")) closeDeadlineModal();
   }
 });
