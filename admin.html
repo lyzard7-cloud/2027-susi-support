@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="./style.css?v=13.2" />
   <link rel="stylesheet" href="./stats-v14.css?v=14.0" />
   <link rel="stylesheet" href="./deadlines-v15.css?v=15.0" />
+  <link rel="stylesheet" href="./dashboard-v17.css?v=17.0" />
 </head>
 <body>
   <header class="topbar">
@@ -53,7 +54,23 @@
         </div>
       </div>
 
-      <section class="card roster-card">
+      <nav class="dashboard-nav" aria-label="관리자 화면 메뉴">
+        <button class="dashboard-nav-btn active" data-dashboard-view="duplicates">중복지원</button>
+        <button class="dashboard-nav-btn" data-dashboard-view="applications">전체 지원</button>
+        <button class="dashboard-nav-btn" data-dashboard-view="deadlines">원서접수 관리</button>
+        <button class="dashboard-nav-btn" data-dashboard-view="analytics">지원 통계</button>
+        <button class="dashboard-nav-btn" data-dashboard-view="students">학생·학급 관리</button>
+      </nav>
+
+      <section class="duplicate-priority-note">
+        <div>
+          <span class="eyebrow">우선 확인</span>
+          <strong>중복지원 탐지 및 협의</strong>
+          <small>기본 화면은 중복지원 관련 정보만 보여줍니다. 다른 정보는 위 메뉴에서 필요할 때 열어보세요.</small>
+        </div>
+      </section>
+
+      <section class="card roster-card dashboard-panel panel-students">
         <div class="section-head">
           <div>
             <h2>3학년 학생 명단</h2>
@@ -75,7 +92,7 @@
         <div id="pinAdminOnlyNote" class="pin-admin-only hidden"></div>
       </section>
 
-      <section class="card myclass-card">
+      <section class="card myclass-card dashboard-context">
         <div class="myclass-bar">
           <div>
             <span class="eyebrow">담당반</span>
@@ -92,11 +109,11 @@
         </div>
       </section>
 
-      <section class="stats-grid">
-        <div class="stat-card">
+      <section class="stats-grid duplicate-stats">
+        <div class="stat-card nonduplicate-stat">
           <span>입력 학생</span><strong id="studentCount">0</strong><small>명</small>
         </div>
-        <div class="stat-card">
+        <div class="stat-card nonduplicate-stat">
           <span>총 지원 건수</span><strong id="applicationCount">0</strong><small>건</small>
         </div>
         <div class="stat-card danger">
@@ -110,7 +127,7 @@
         </div>
       </section>
 
-      <section class="status-summary-grid">
+      <section class="status-summary-grid dashboard-panel panel-applications">
         <button class="status-summary-card" data-status="">
           <span>전체</span><strong id="statusAllCount">0</strong><small>건</small>
         </button>
@@ -128,7 +145,7 @@
         </button>
       </section>
 
-      <section class="result-summary-grid">
+      <section class="result-summary-grid dashboard-panel panel-applications">
         <button class="result-summary-card" data-result="">
           <span>결과 전체</span><strong id="resultAllCount">0</strong><small>건</small>
         </button>
@@ -153,7 +170,7 @@
 
 
 
-      <section class="card deadline-card">
+      <section class="card deadline-card dashboard-panel panel-deadlines">
         <div class="section-head">
           <div>
             <span class="eyebrow">원서접수 기간 관리</span>
@@ -194,7 +211,7 @@
         <div id="riskList" class="risk-list"></div>
       </section>
 
-      <section class="card analytics-card">
+      <section class="card analytics-card dashboard-panel panel-analytics">
         <div class="section-head">
           <div>
             <span class="eyebrow">학년 전체 통계</span>
@@ -260,7 +277,7 @@
         </div>
       </section>
 
-      <section class="card class-status-card">
+      <section class="card class-status-card dashboard-panel panel-students">
         <div class="section-head">
           <div>
             <h2>반별 입력 현황</h2>
@@ -270,7 +287,7 @@
         <div id="classStatusGrid" class="class-status-grid"></div>
       </section>
 
-      <section id="missingSection" class="card hidden">
+      <section id="missingSection" class="card hidden dashboard-panel panel-students">
         <div class="section-head">
           <div>
             <h2 id="missingTitle">미입력 학생</h2>
@@ -281,7 +298,7 @@
         <div id="missingList" class="missing-list"></div>
       </section>
 
-      <section class="card filters">
+      <section class="card filters dashboard-panel panel-applications">
         <div class="filter-grid">
           <label>반
             <select id="filterClass">
@@ -345,19 +362,29 @@
         </div>
       </section>
 
-      <section class="dashboard-grid">
+      <section class="dashboard-grid duplicate-workspace">
         <div class="card">
-          <div class="section-head">
+          <div class="section-head duplicate-head">
             <div>
+              <span class="eyebrow">핵심 업무</span>
               <h2>중복지원 탐지</h2>
               <p>같은 대학·학과·전형을 우선 확인하세요. 대학명·학과명의 흔한 표기 차이는 자동 보정하여 비교합니다.</p>
               <p class="helper">중복 그룹마다 협의상태와 메모를 남기면 다음 접속 때도 그대로 유지됩니다.</p>
             </div>
+            <label class="duplicate-review-quick">협의상태
+              <select id="duplicateReviewQuickFilter">
+                <option value="">전체</option>
+                <option value="미검토">미검토</option>
+                <option value="협의중">협의중</option>
+                <option value="조정완료">조정완료</option>
+                <option value="중복허용">중복허용</option>
+              </select>
+            </label>
           </div>
           <div id="duplicateGroups" class="duplicate-list"></div>
         </div>
 
-        <div class="card">
+        <div class="card dashboard-panel panel-applications application-list-card">
           <div class="section-head">
             <div>
               <h2>전체 지원 목록</h2>
@@ -541,6 +568,6 @@
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./admin.js?v=16.0"></script>
+  <script type="module" src="./admin.js?v=17.0"></script>
 </body>
 </html>

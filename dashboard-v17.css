@@ -1,0 +1,74 @@
+
+/* v17 - 중복지원 우선 관리자 대시보드 */
+#dashboard:not(.hidden){display:flex;flex-direction:column;gap:14px}
+
+.dashboard-nav{
+  position:sticky;top:8px;z-index:20;
+  display:flex;gap:7px;align-items:center;
+  padding:7px;background:rgba(255,255,255,.96);
+  border:1px solid #dfe5ee;border-radius:14px;
+  box-shadow:0 7px 22px rgba(37,49,72,.08);
+  backdrop-filter:blur(8px);
+}
+.dashboard-nav-btn{
+  border:0;background:transparent;color:#5c6879;
+  border-radius:9px;padding:9px 13px;cursor:pointer;
+  font-size:12px;font-weight:700;
+}
+.dashboard-nav-btn:hover{background:#f1f4f8}
+.dashboard-nav-btn.active{background:#243a66;color:#fff}
+
+.duplicate-priority-note{
+  border:1px solid #efcaca;background:#fff8f8;
+  border-radius:13px;padding:11px 14px;
+}
+.duplicate-priority-note>div{
+  display:grid;grid-template-columns:auto auto 1fr;
+  gap:5px 10px;align-items:center;
+}
+.duplicate-priority-note .eyebrow{margin:0}
+.duplicate-priority-note strong{font-size:13px}
+.duplicate-priority-note small{font-size:10px;color:#788394}
+
+.dashboard-context{margin:0}
+.dashboard-context .myclass-bar{padding:2px 0}
+
+.dashboard-panel{display:none !important}
+.dashboard-panel.dashboard-panel-open{display:block !important}
+.status-summary-grid.dashboard-panel-open,
+.result-summary-grid.dashboard-panel-open{display:grid !important}
+
+.duplicate-stats{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  margin-top:0;
+}
+.duplicate-stats .nonduplicate-stat{display:none}
+.duplicate-stats .nonduplicate-stat.show-nonduplicate-stat{display:block}
+body[data-dashboard-view="applications"] .duplicate-stats{
+  grid-template-columns:repeat(5,minmax(0,1fr));
+}
+
+.duplicate-workspace{display:block !important}
+.duplicate-workspace>.card:first-child{
+  border:1px solid #e9bbbb;
+  box-shadow:0 8px 28px rgba(132,50,50,.07);
+}
+.duplicate-workspace>.card.application-list-card{margin-top:14px}
+
+.duplicate-head{align-items:flex-end}
+.duplicate-review-quick{min-width:150px;font-size:10px;color:#657184}
+.duplicate-review-quick select{margin-top:4px}
+
+.panel-applications.filters.dashboard-panel-open{display:block !important}
+.panel-students.roster-card.dashboard-panel-open,
+.panel-students.class-status-card.dashboard-panel-open{display:block !important}
+
+@media(max-width:800px){
+  .dashboard-nav{overflow-x:auto;white-space:nowrap;position:static}
+  .dashboard-nav-btn{flex:0 0 auto}
+  .duplicate-stats{grid-template-columns:repeat(3,1fr)}
+  body[data-dashboard-view="applications"] .duplicate-stats{grid-template-columns:repeat(2,1fr)}
+  .duplicate-priority-note>div{grid-template-columns:1fr}
+  .duplicate-head{align-items:stretch}
+  .duplicate-review-quick{width:100%}
+}

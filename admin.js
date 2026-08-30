@@ -1608,7 +1608,9 @@ $("#teacherClassSaveBtn").addEventListener("click", async () => {
     btn.textContent = "담당반 설정 저장";
   }
 });
-$("#filterDuplicateReview").addEventListener("change", () => {
+$("#filterDuplicateReview").addEventListener("change", (e) => {
+  const quick = $("#duplicateReviewQuickFilter");
+  if (quick) quick.value = e.target.value;
   renderDuplicates();
 });
 $("#analyticsDetailCloseBtn").addEventListener("click", closeAnalyticsDetail);
@@ -1772,6 +1774,51 @@ $("#closeMissingBtn").addEventListener("click", () => {
   $("#missingSection").classList.add("hidden");
 });
 
+
+function setDashboardView(view = "duplicates", scroll = false) {
+  const allowed = new Set(["duplicates","applications","deadlines","analytics","students"]);
+  if (!allowed.has(view)) view = "duplicates";
+
+  document.querySelectorAll(".dashboard-panel").forEach(el => {
+    el.classList.toggle("dashboard-panel-open", el.classList.contains(`panel-${view}`));
+  });
+
+  document.querySelectorAll(".dashboard-nav-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.dashboardView === view);
+  });
+
+  document.body.dataset.dashboardView = view;
+
+  document.querySelectorAll(".nonduplicate-stat").forEach(el => {
+    el.classList.toggle("show-nonduplicate-stat", view === "applications");
+  });
+
+  if (scroll) {
+    const target = view === "duplicates"
+      ? document.querySelector(".duplicate-workspace")
+      : document.querySelector(`.panel-${view}.dashboard-panel`);
+    target?.scrollIntoView({behavior:"smooth", block:"start"});
+  }
+}
+
+function syncDuplicateReviewFilters(sourceValue) {
+  const quick = document.querySelector("#duplicateReviewQuickFilter");
+  const full = document.querySelector("#filterDuplicateReview");
+  if (quick && quick.value !== sourceValue) quick.value = sourceValue;
+  if (full && full.value !== sourceValue) full.value = sourceValue;
+  renderDuplicates();
+}
+
+document.querySelectorAll(".dashboard-nav-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    setDashboardView(btn.dataset.dashboardView || "duplicates", true);
+  });
+});
+
+$("#duplicateReviewQuickFilter")?.addEventListener("change", (e) => {
+  syncDuplicateReviewFilters(e.target.value);
+});
+
 $("#loginBtn").addEventListener("click", async () => {
   $("#loginError").textContent = "";
   try {
@@ -1885,6 +1932,7 @@ onAuthStateChanged(auth, user => {
   if (user) {
     $("#loginPanel").classList.add("hidden");
     $("#dashboard").classList.remove("hidden");
+      setDashboardView("duplicates");
     updateMyClassUI();
     if (unsubscribe) unsubscribe();
     if (unsubscribeRoster) unsubscribeRoster();
