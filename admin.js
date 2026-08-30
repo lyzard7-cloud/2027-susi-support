@@ -1793,6 +1793,10 @@ function setDashboardView(view = "duplicates", scroll = false) {
     el.classList.toggle("show-nonduplicate-stat", view === "applications");
   });
 
+  if (view !== "applications") {
+    setApplicationListOpen(false);
+  }
+
   if (scroll) {
     const target = view === "duplicates"
       ? document.querySelector(".duplicate-workspace")
@@ -1814,6 +1818,22 @@ document.querySelectorAll(".dashboard-nav-btn").forEach(btn => {
     setDashboardView(btn.dataset.dashboardView || "duplicates", true);
   });
 });
+
+function setApplicationListOpen(open) {
+  const content = $("#applicationListContent");
+  const button = $("#toggleApplicationListBtn");
+  if (!content || !button) return;
+  content.classList.toggle("hidden", !open);
+  button.setAttribute("aria-expanded", open ? "true" : "false");
+  button.textContent = open ? "전체 지원 목록 접기" : "전체 지원 목록 보기";
+}
+
+$("#toggleApplicationListBtn")?.addEventListener("click", () => {
+  const button = $("#toggleApplicationListBtn");
+  const isOpen = button?.getAttribute("aria-expanded") === "true";
+  setApplicationListOpen(!isOpen);
+});
+
 
 $("#duplicateReviewQuickFilter")?.addEventListener("change", (e) => {
   syncDuplicateReviewFilters(e.target.value);

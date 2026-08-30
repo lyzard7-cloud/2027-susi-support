@@ -23,6 +23,11 @@
       }
     }
   </style>
+
+  <style>
+    .application-list-content.hidden { display: none !important; }
+    .application-list-card .section-head { align-items: center; }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -405,16 +410,20 @@
               <h2>전체 지원 목록</h2>
               <p id="visibleCount">0건 표시</p>
             </div>
+            <button id="toggleApplicationListBtn" class="secondary" type="button" aria-expanded="false">전체 지원 목록 보기</button>
           </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>학생</th><th>대학</th><th>학과</th><th>전형유형</th><th>전형명</th><th>상태</th><th>합격결과</th><th>예비번호</th>
-                </tr>
-              </thead>
-              <tbody id="applicationTable"></tbody>
-            </table>
+
+          <div id="applicationListContent" class="application-list-content hidden">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>학생</th><th>대학</th><th>학과</th><th>전형유형</th><th>전형명</th><th>상태</th><th>합격결과</th><th>예비번호</th>
+                  </tr>
+                </thead>
+                <tbody id="applicationTable"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
@@ -583,6 +592,6 @@
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./admin.js?v=17.0"></script>
+  <script type="module" src="./admin.js?v=18.1"></script>
 </body>
 </html>
