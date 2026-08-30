@@ -227,6 +227,51 @@
       .single-student-form{grid-template-columns:1fr;}
     }
   </style>
+
+  <style>
+    .single-student-form {
+      grid-template-columns:110px 130px minmax(180px,1fr) minmax(220px,1.25fr) !important;
+    }
+    .single-student-pin-label small {
+      display:block;
+      margin-top:5px;
+      color:#7b8798;
+      font-size:9px;
+      line-height:1.4;
+    }
+    .single-pin-wrap {
+      display:flex;
+      gap:6px;
+      align-items:center;
+      margin-top:5px;
+    }
+    .single-pin-wrap input {
+      margin-top:0 !important;
+      min-width:0;
+      flex:1;
+      letter-spacing:.12em;
+    }
+    .single-pin-wrap button {
+      flex:0 0 auto;
+      white-space:nowrap;
+    }
+    @media(max-width:850px){
+      .single-student-form{
+        grid-template-columns:1fr 1fr !important;
+      }
+      .single-student-pin-label{
+        grid-column:1 / -1;
+      }
+    }
+    @media(max-width:560px){
+      .single-student-form{
+        grid-template-columns:1fr !important;
+      }
+      .single-student-pin-label{
+        grid-column:auto;
+      }
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -784,11 +829,20 @@
         <label>이름
           <input id="singleStudentName" type="text" maxlength="20" placeholder="예: 신송화" />
         </label>
+
+        <label class="single-student-pin-label">기존 PIN <span class="helper">(선택)</span>
+          <div class="single-pin-wrap">
+            <input id="singleStudentPin" type="password" inputmode="numeric" maxlength="8" placeholder="예: 12345678" autocomplete="off" />
+            <button id="singleStudentPinToggle" class="ghost small-btn" type="button">보기</button>
+          </div>
+          <small>예전에 사용하던 8자리 PIN을 알고 있다면 입력하세요.</small>
+        </label>
       </div>
 
       <div class="single-student-note">
         <span>안전하게 추가됩니다.</span>
-        기존 학생명단, 다른 학생의 PIN, 지원정보는 변경하지 않습니다.
+        PIN을 입력하면 그 PIN까지 함께 복구하고, 비워두면 학생만 추가합니다.
+        기존 학생명단과 다른 학생의 PIN·지원정보는 변경하지 않습니다.
       </div>
 
       <div class="modal-actions">
@@ -895,6 +949,6 @@
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./admin.js?v=18.5"></script>
+  <script type="module" src="./admin.js?v=18.6"></script>
 </body>
 </html>

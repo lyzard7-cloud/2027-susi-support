@@ -1941,6 +1941,9 @@ function openAddSingleStudentModal() {
   $("#singleStudentClass").value = "";
   $("#singleStudentNo").value = "";
   $("#singleStudentName").value = "";
+  $("#singleStudentPin").value = "";
+  $("#singleStudentPin").type = "password";
+  $("#singleStudentPinToggle").textContent = "보기";
   $("#addSingleStudentModal").classList.remove("hidden");
   $("#addSingleStudentModal").setAttribute("aria-hidden", "false");
   setTimeout(() => $("#singleStudentClass").focus(), 50);
@@ -1957,10 +1960,14 @@ async function addSingleStudent() {
   const classNo = String($("#singleStudentClass").value || "").trim();
   const studentNo = String(Number($("#singleStudentNo").value || 0));
   const studentName = String($("#singleStudentName").value || "").trim();
+  const requestedPin = String($("#singleStudentPin").value || "").trim();
 
   if (!classNo) return toast("반을 선택해 주세요.");
   if (!studentNo || studentNo === "0") return toast("번호를 입력해 주세요.");
   if (!studentName) return toast("학생 이름을 입력해 주세요.");
+  if (requestedPin && !/^\d{8}$/.test(requestedPin)) {
+    return toast("기존 PIN은 숫자 8자리로 입력해 주세요.");
+  }
 
   const normalizedName = normalize(studentName);
   const studentKey = `${classNo}-${String(studentNo).padStart(2,"0")}-${normalizedName}`;
@@ -1994,21 +2001,55 @@ async function addSingleStudent() {
 
   try {
     const ref = doc(collection(db, "students"));
-    await setDoc(ref, {
+    const restoredAccessId = requestedPin
+      ? await accessIdFor(studentKey, requestedPin)
+      : "";
+
+    // 동일 studentKey+PIN으로 만들어지는 accessId가 이미 존재한다면
+    // 다른 학생과 잘못 연결되는 상황을 막기 위해 먼저 확인한다.
+    if (restoredAccessId) {
+      const accessSnap = await getDoc(doc(db, "studentAccess", restoredAccessId));
+      if (accessSnap.exists() && accessSnap.data()?.studentKey !== studentKey) {
+        throw new Error("이 PIN 인증정보가 다른 학생과 연결되어 있어 사용할 수 없습니다.");
+      }
+    }
+
+    const batch = writeBatch(db);
+    batch.set(ref, {
       classNo,
       studentNo,
       studentName,
       studentKey,
-      pin: "",
-      accessId: "",
+      pin: requestedPin || "",
+      accessId: restoredAccessId,
       createdAt: serverTimestamp(),
       addedIndividually: true,
+      pinRestoredManually: !!requestedPin,
       addedByUid: auth.currentUser?.uid || "",
       addedByEmail: auth.currentUser?.email || ""
     });
 
+    if (restoredAccessId) {
+      batch.set(doc(db, "studentAccess", restoredAccessId), {
+        studentKey,
+        classNo,
+        studentNo,
+        createdAt: serverTimestamp(),
+        restoredManually: true,
+        restoredByUid: auth.currentUser?.uid || "",
+        restoredByEmail: auth.currentUser?.email || ""
+      });
+    }
+
+    await batch.commit();
+
     closeAddSingleStudentModal();
-    toast(`${classNo}반 ${studentNo}번 ${studentName} 학생을 추가했습니다. 필요하면 PIN을 발급해 주세요.`);
+
+    if (requestedPin) {
+      toast(`${classNo}반 ${studentNo}번 ${studentName} 학생을 추가하고 기존 PIN도 복구했습니다.`);
+    } else {
+      toast(`${classNo}반 ${studentNo}번 ${studentName} 학생을 추가했습니다. 필요하면 PIN을 발급해 주세요.`);
+    }
   } catch (e) {
     console.error(e);
     toast(e.message || "학생 추가에 실패했습니다.");
@@ -2029,6 +2070,22 @@ $("#addSingleStudentConfirmBtn").addEventListener("click", addSingleStudent);
 $("#singleStudentName").addEventListener("keydown", (e) => {
   if (e.key === "Enter") addSingleStudent();
 });
+
+$("#singleStudentPin").addEventListener("input", (e) => {
+  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 8);
+});
+
+$("#singleStudentPin").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") addSingleStudent();
+});
+
+$("#singleStudentPinToggle").addEventListener("click", () => {
+  const input = $("#singleStudentPin");
+  const showing = input.type === "text";
+  input.type = showing ? "password" : "text";
+  $("#singleStudentPinToggle").textContent = showing ? "보기" : "숨기기";
+});
+
 
 $("#exportPinsBtn").addEventListener("click",()=>{
   if(!roster.length)return toast("학생 명단이 없습니다.");const missing=roster.filter(r=>!r.pin);if(missing.length)return toast(`PIN이 없는 학생이 ${missing.length}명 있습니다. PIN 일괄 생성을 먼저 실행하세요.`);
