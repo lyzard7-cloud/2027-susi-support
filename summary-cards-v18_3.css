@@ -1,0 +1,198 @@
+
+/* v18.3 - 지원 현황 요약 카드 정돈 */
+
+/* 모든 요약 카드는 5열, 같은 너비/높이 */
+.duplicate-stats,
+.status-summary-grid,
+.result-summary-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+  align-items: stretch;
+}
+
+.summary-card,
+.uniform-summary-card {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 124px;
+  height: 124px;
+  border-radius: 16px !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 상단 카드 공통 */
+.summary-card {
+  display: flex !important;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 19px 20px !important;
+  background: #fff !important;
+  border: 1px solid #e3e8ef !important;
+  box-shadow:
+    0 8px 24px rgba(30, 41, 59, .055),
+    0 1px 2px rgba(30, 41, 59, .035) !important;
+}
+
+.summary-card::before,
+.uniform-summary-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--card-accent, #94a3b8);
+}
+
+.summary-card span,
+.uniform-summary-card span {
+  font-size: 12px !important;
+  font-weight: 700;
+  color: #64748b !important;
+  line-height: 1.25;
+}
+
+.summary-card strong,
+.uniform-summary-card strong {
+  display: inline-block;
+  margin-top: 13px !important;
+  font-size: 31px !important;
+  line-height: 1;
+  letter-spacing: -.04em;
+  color: #172033 !important;
+}
+
+.summary-card small,
+.uniform-summary-card small {
+  margin-left: 5px;
+  font-size: 11px !important;
+  color: #64748b !important;
+}
+
+/* 카드별 포인트 */
+.neutral-card { --card-accent:#94a3b8; }
+.total-card { --card-accent:#5277b8; }
+.duplicate-exact-card { --card-accent:#e45f5f; background:#fffafa !important; }
+.duplicate-dept-card { --card-accent:#e9a23b; background:#fffdf8 !important; }
+.duplicate-review-card { --card-accent:#6386c7; background:#fafcff !important; }
+
+/* 지원상태/결과 버튼 카드 */
+.uniform-summary-card {
+  width: 100%;
+  padding: 18px 16px !important;
+  border: 1px solid #e1e7ef !important;
+  background: #fff !important;
+  box-shadow:
+    0 7px 22px rgba(30, 41, 59, .05),
+    0 1px 2px rgba(30, 41, 59, .03) !important;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform .16s ease,
+    box-shadow .16s ease,
+    border-color .16s ease;
+}
+
+.uniform-summary-card:hover {
+  transform: translateY(-2px);
+  border-color: #c7d1df !important;
+  box-shadow:
+    0 11px 28px rgba(30, 41, 59, .09),
+    0 2px 4px rgba(30, 41, 59, .04) !important;
+}
+
+.uniform-summary-card:active {
+  transform: translateY(0);
+}
+
+.uniform-summary-card.active {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--card-accent) 23%, transparent),
+    0 10px 25px rgba(30, 41, 59, .07) !important;
+  border-color: var(--card-accent) !important;
+}
+
+.status-all-card { --card-accent:#6687c5; }
+.status-review-card { --card-accent:#8b97a8; }
+.status-teacher-card { --card-accent:#4d83c5; }
+.status-final-card { --card-accent:#8a6cc2; }
+.status-submitted-card { --card-accent:#319a91; background:#fafffe !important; }
+
+.result-first-card { --card-accent:#48a16a; background:#fbfffc !important; }
+.result-wait-card { --card-accent:#d99b39; background:#fffdf8 !important; }
+.result-extra-card { --card-accent:#3b9e73; background:#fbfffc !important; }
+.result-fail-card { --card-accent:#df6767; background:#fffafa !important; }
+.result-registered-card { --card-accent:#4778bd; background:#fafcff !important; }
+
+/* 결과 전체는 총 지원 건수와 중복되므로 화면에서는 제외 */
+.result-total-hidden {
+  display: none !important;
+}
+
+/* 행 제목 */
+.summary-section-title {
+  margin: 4px 0 -3px;
+  padding: 0 2px;
+}
+.summary-section-title.dashboard-panel-open {
+  display: block !important;
+}
+.summary-section-title > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.summary-section-title strong {
+  font-size: 13px;
+  color: #334155;
+}
+.summary-section-title small {
+  font-size: 10px;
+  color: #8390a2;
+}
+.summary-title-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 8px;
+}
+.progress-dot { background:#5277b8; }
+.result-dot { background:#48a16a; }
+
+/* 기존 색 배경/테두리가 덮어쓰지 않도록 정리 */
+.status-summary-card,
+.result-summary-card {
+  color: inherit;
+}
+
+/* 화면 폭에 따른 일관된 반응형 */
+@media (max-width: 1180px) {
+  .duplicate-stats,
+  .status-summary-grid,
+  .result-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .duplicate-stats,
+  .status-summary-grid,
+  .result-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .summary-card,
+  .uniform-summary-card {
+    min-height: 110px;
+    height: 110px;
+  }
+  .summary-card strong,
+  .uniform-summary-card strong {
+    font-size: 27px !important;
+  }
+  .summary-section-title small {
+    display: none;
+  }
+}

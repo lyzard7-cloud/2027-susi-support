@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./stats-v14.css?v=14.0" />
   <link rel="stylesheet" href="./deadlines-v15.css?v=15.0" />
   <link rel="stylesheet" href="./dashboard-v17.css?v=17.0" />
+  <link rel="stylesheet" href="./summary-cards-v18_3.css?v=18.3" />
 
   <style>
     .dashboard-main-title {
@@ -207,58 +208,72 @@
       </section>
 
       <section class="stats-grid duplicate-stats">
-        <div class="stat-card nonduplicate-stat">
+        <div class="stat-card nonduplicate-stat summary-card neutral-card">
           <span>입력 학생</span><strong id="studentCount">0</strong><small>명</small>
         </div>
-        <div class="stat-card nonduplicate-stat">
+        <div class="stat-card nonduplicate-stat summary-card total-card">
           <span>총 지원 건수</span><strong id="applicationCount">0</strong><small>건</small>
         </div>
-        <div class="stat-card danger">
+        <div class="stat-card danger summary-card duplicate-exact-card">
           <span>완전 중복 그룹</span><strong id="exactCount">0</strong><small>개</small>
         </div>
-        <div class="stat-card warning">
+        <div class="stat-card warning summary-card duplicate-dept-card">
           <span>학과 중복 그룹</span><strong id="deptCount">0</strong><small>개</small>
         </div>
-        <div class="stat-card review">
+        <div class="stat-card review summary-card duplicate-review-card">
           <span>미처리 중복</span><strong id="unresolvedDupCount">0</strong><small>개</small>
         </div>
       </section>
 
+      <div class="summary-section-title dashboard-panel panel-applications">
+        <div>
+          <span class="summary-title-dot progress-dot"></span>
+          <strong>지원 진행 상태</strong>
+          <small>카드를 누르면 해당 상태만 바로 확인할 수 있습니다.</small>
+        </div>
+      </div>
       <section class="status-summary-grid dashboard-panel panel-applications">
-        <button class="status-summary-card" data-status="">
+        <button class="status-summary-card uniform-summary-card status-all-card" data-status="">
           <span>전체</span><strong id="statusAllCount">0</strong><small>건</small>
         </button>
-        <button class="status-summary-card" data-status="검토중">
+        <button class="status-summary-card uniform-summary-card status-review-card" data-status="검토중">
           <span>검토중</span><strong id="statusReviewCount">0</strong><small>건</small>
         </button>
-        <button class="status-summary-card" data-status="담임확인">
+        <button class="status-summary-card uniform-summary-card status-teacher-card" data-status="담임확인">
           <span>담임확인</span><strong id="statusTeacherCount">0</strong><small>건</small>
         </button>
-        <button class="status-summary-card" data-status="최종결정">
+        <button class="status-summary-card uniform-summary-card status-final-card" data-status="최종결정">
           <span>최종결정</span><strong id="statusFinalCount">0</strong><small>건</small>
         </button>
-        <button class="status-summary-card submitted" data-status="원서접수완료">
+        <button class="status-summary-card submitted uniform-summary-card status-submitted-card" data-status="원서접수완료">
           <span>원서접수완료</span><strong id="statusSubmittedCount">0</strong><small>건</small>
         </button>
       </section>
 
+      <div class="summary-section-title dashboard-panel panel-applications">
+        <div>
+          <span class="summary-title-dot result-dot"></span>
+          <strong>지원 결과</strong>
+          <small>합격 결과를 선택해 전체 지원 목록을 필터링합니다.</small>
+        </div>
+      </div>
       <section class="result-summary-grid dashboard-panel panel-applications">
-        <button class="result-summary-card" data-result="">
+        <button class="result-summary-card result-total-hidden" data-result="" aria-hidden="true" tabindex="-1">
           <span>결과 전체</span><strong id="resultAllCount">0</strong><small>건</small>
         </button>
-        <button class="result-summary-card success" data-result="최초합격">
+        <button class="result-summary-card success uniform-summary-card result-first-card" data-result="최초합격">
           <span>최초합격</span><strong id="resultFirstCount">0</strong><small>건</small>
         </button>
-        <button class="result-summary-card wait" data-result="예비">
+        <button class="result-summary-card wait uniform-summary-card result-wait-card" data-result="예비">
           <span>예비</span><strong id="resultWaitCount">0</strong><small>건</small>
         </button>
-        <button class="result-summary-card success" data-result="추가합격">
+        <button class="result-summary-card success uniform-summary-card result-extra-card" data-result="추가합격">
           <span>추가합격</span><strong id="resultExtraCount">0</strong><small>건</small>
         </button>
-        <button class="result-summary-card fail" data-result="불합격">
+        <button class="result-summary-card fail uniform-summary-card result-fail-card" data-result="불합격">
           <span>불합격</span><strong id="resultFailCount">0</strong><small>건</small>
         </button>
-        <button class="result-summary-card registered" data-result="최종등록">
+        <button class="result-summary-card registered uniform-summary-card result-registered-card" data-result="최종등록">
           <span>최종등록</span><strong id="resultRegisteredCount">0</strong><small>건</small>
         </button>
       </section>
@@ -676,6 +691,6 @@
 
   <div id="toast" class="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./admin.js?v=18.2"></script>
+  <script type="module" src="./admin.js?v=18.3"></script>
 </body>
 </html>
