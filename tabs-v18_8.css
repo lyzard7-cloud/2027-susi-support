@@ -1,0 +1,20 @@
+
+/* v18.8 - 중복지원 탐지 영역은 '중복지원' 탭에서만 표시 */
+
+/* 기본적으로 중복지원 탐지 카드는 숨김 */
+.duplicate-detector-card {
+  display: none !important;
+}
+
+/* 중복지원 탭에서만 강제로 표시 */
+body[data-dashboard-view="duplicates"] .duplicate-detector-card {
+  display: block !important;
+}
+
+/* 나머지 탭에서는 혹시 다른 스타일이 개입해도 무조건 숨김 */
+body[data-dashboard-view="applications"] .duplicate-detector-card,
+body[data-dashboard-view="deadlines"] .duplicate-detector-card,
+body[data-dashboard-view="analytics"] .duplicate-detector-card,
+body[data-dashboard-view="students"] .duplicate-detector-card {
+  display: none !important;
+}
